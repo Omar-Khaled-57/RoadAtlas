@@ -1,0 +1,36 @@
+{
+  "name": "@roadatlas/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup src/index.ts --format esm --target node20 --out-dir dist --clean",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "bcryptjs": "*",
+    "cookie-parser": "*",
+    "cors": "*",
+    "dotenv": "*",
+    "express": "*",
+    "express-rate-limit": "*",
+    "helmet": "*",
+    "jsonwebtoken": "*",
+    "mongoose": "*",
+    "morgan": "*",
+    "zod": "*"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "*",
+    "@types/cors": "*",
+    "@types/express": "*",
+    "@types/jsonwebtoken": "*",
+    "@types/morgan": "*",
+    "@types/node": "*",
+    "tsup": "*",
+    "tsx": "*",
+    "typescript": "*"
+  }
+}

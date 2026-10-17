@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" dir="ltr" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RoadAtlas</title>
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('roadatlas.theme');
+          if (theme !== 'light' && theme !== 'dark' && theme !== 'ocean') {
+            theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+
+          var lang = localStorage.getItem('roadatlas.lang');
+          if (lang !== 'en' && lang !== 'ar') {
+            lang = (navigator.language || 'en').indexOf('ar') === 0 ? 'ar' : 'en';
+          }
+          document.documentElement.setAttribute('lang', lang);
+          document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
