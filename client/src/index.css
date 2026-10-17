@@ -481,19 +481,19 @@ body {
   transform: translate(-50%, -50%) rotate(-24deg);
 }
 .orbit-one {
-  width: 96%;
-  height: 46%;
+  width: 88%;
+  height: 42%;
   border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 .orbit-two {
-  width: 96%;
-  height: 46%;
+  width: 88%;
+  height: 42%;
   transform: translate(-50%, -50%) rotate(45deg);
   border-color: color-mix(in srgb, var(--secondary) 26%, transparent);
 }
 .orbit-three {
-  width: 96%;
-  height: 46%;
+  width: 88%;
+  height: 42%;
   transform: translate(-50%, -50%) rotate(-45deg);
   border-style: dashed;
   border-color: var(--border-subtle);
@@ -502,8 +502,8 @@ body {
   position: relative;
   z-index: 2;
   display: flex;
-  width: clamp(72px, 26%, 92px);
-  height: clamp(72px, 26%, 92px);
+  width: clamp(84px, 30%, 108px);
+  height: clamp(84px, 30%, 108px);
   flex-direction: column;
   align-items: center;
   justify-content: center;
