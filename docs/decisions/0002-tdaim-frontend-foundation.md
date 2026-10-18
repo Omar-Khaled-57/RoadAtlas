@@ -4,7 +4,7 @@
 
 ## Context
 
-RoadAtlas follows **TDAIM** — _Theme-Direction-Aware Modular Incremental Model_ (named in the
+RoadAtlas follows **TDAIM** — _Theme- and Direction-Aware Incremental Model_ (named in the
 [source conversation](../research/react-native-vs-kmp.md)). The core rule: **choose tools that
 support your architecture, rather than adapting your architecture to the tools.** Two concerns are
 **day-one, not retrofitted**:
@@ -12,6 +12,11 @@ support your architecture, rather than adapting your architecture to the tools.*
 - **Theme awareness** — dark **and** light, via semantic tokens (not hard-coded colors).
 - **Direction awareness** — English **and** Arabic, with correct **RTL/LTR** using **logical CSS
   properties** (`margin-inline-*`, `padding-inline-*`, `inset-inline-*`, `text-align: start`).
+
+Modularity is how TDAIM is practiced: build cohesive feature modules incrementally and keep changes
+localized. TDAIM is the project owner's name for this combination of principles, not a claim of an
+established industry standard. See the [product vision](../product-vision-and-delivery.md) for the
+full principles and delivery expectations.
 
 ## Decision
 

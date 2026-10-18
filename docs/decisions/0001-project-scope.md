@@ -4,21 +4,28 @@
 
 ## Context
 
-Personal tool + portfolio to **showcase, follow, track and revisit** tech roadmaps: branching hub
-roadmaps (e.g. Mobile Dev → Flutter / KMP / React Native → per-tech roadmap), tech **comparison**
-tables, multi-metric **curves with written findings**, and project **pipelines**.
+Personal-first, online tool + portfolio to **showcase, follow, track and revisit** engineering
+roadmaps, technology comparisons, connected knowledge, architecture decisions, multi-metric curves,
+and project pipelines. It should preserve not only progress and conclusions, but also the evidence
+and hidden friction discovered as a technology or project becomes more complex. See the
+[product vision](../product-vision-and-delivery.md) and its [founding research](../research/react-native-vs-kmp.md).
 
 ## Decision
 
 - **Monorepo** (npm workspaces): `client/` (Vite + React), `server/` (Express), `shared/` (types).
 - **TypeScript** everywhere.
 - **MongoDB Atlas** (free tier) — no local Mongo (tight disk).
-- **Frontend:** React Router, Tailwind, **Framer Motion**, **React Flow** (`@xyflow/react`),
-  **Recharts**, TanStack Query.
+- **Frontend:** React Router, Tailwind, **React Flow** (`@xyflow/react`),
+  TanStack Query.
 - **Backend:** Express, Mongoose, zod, JWT in httpOnly cookie, bcrypt.
-- **Admin:** single admin (env credentials); public read, protected writes.
-- **Progress:** stored in DB, tied to the admin login.
-- **Local-first now**, structured so it can deploy later.
+- **Access:** one owner in the first release; deployed online with secure authentication and
+  server-side authorization. Resources are private by default; selected resources can be published
+  for the portfolio.
+- **Progress:** stored in the database and scoped to its owner.
+- **Multi-user ready:** ownership is part of the data model from the start, while collaboration and
+  shared workspaces remain later scope.
+- **Deployment:** design for a production deployment from the first useful slice, not as a local-only
+  prototype.
 
 ### Data model
 

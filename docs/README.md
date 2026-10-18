@@ -12,6 +12,12 @@ small file and can evolve without rewriting the rest.
 | [0003](./decisions/0003-information-architecture.md)  | Information architecture & home page                       | Proposed |
 | [0004](./decisions/0004-domain-model-v2.md)           | Domain model v2 (ownership, i18n content, focus, criteria) | Proposed |
 
+## Product direction
+
+- [Product vision and delivery plan](./product-vision-and-delivery.md) — the purpose, TDAIM
+  principles, privacy and hosting assumptions, module map, incremental delivery sequence, and
+  quality bar distilled from the founding conversation.
+
 ## Page specs
 
 Per-page specifications (each split into section specs), with priorities. Start at the
@@ -19,10 +25,11 @@ Per-page specifications (each split into section specs), with priorities. Start 
 
 ## Research / inspiration
 
-- [React Native vs KMP](./research/react-native-vs-kmp.md) — the source conversation that seeded
-  RoadAtlas: RN vs KMP vs Flutter comparisons, use cases, "hidden friction", and the
-  **learning curve vs complexity curve** framing. Reused as comparison content and as reasoning
-  behind decision 0002 (TDAIM).
+- [React Native vs KMP](./research/react-native-vs-kmp.md) — exported founding conversation:
+  framework comparisons, hidden friction, the learning-vs-complexity curve, TDAIM, and the original
+  RoadAtlas scope. The [shared conversation](https://chatgpt.com/share/6ad078b0-f308-83ea-9654-c84e63fe42c1)
+  is the source; the local export is the searchable reference. See the product brief for the current
+  distilled direction.
 
 ## How to add a decision
 

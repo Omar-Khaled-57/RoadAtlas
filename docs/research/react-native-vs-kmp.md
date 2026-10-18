@@ -2,6 +2,10 @@
 
 _Source: `/tmp/s2.json` — shared conversation titled "React Native Vs KMP"._
 
+This export is the detailed source for the product direction distilled in
+[`../product-vision-and-delivery.md`](../product-vision-and-delivery.md). The framework comparisons
+are research context; the selected project is a web-based MERN application.
+
 ---
 
 ## Turn 1 — User

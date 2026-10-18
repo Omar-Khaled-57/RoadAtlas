@@ -1,5 +1,11 @@
 export type ID = string;
 
+export interface HealthResponse {
+  status: string;
+  service: string;
+  time: string;
+}
+
 export type Visibility = 'public' | 'private';
 
 export interface LocalizedString {
@@ -153,4 +159,19 @@ export interface Progress extends Timestamps {
 export interface ApiError {
   message: string;
   details?: unknown;
+}
+
+export interface AuthUser {
+  id: ID;
+  email: string;
+}
+
+export interface AuthSession {
+  authenticated: boolean;
+  user: AuthUser | null;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
 }

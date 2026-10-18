@@ -6,16 +6,16 @@ with written findings, side-by-side **comparisons**, and project **pipelines**.
 
 ## Stack
 
-- **client/** — Vite + React + TypeScript, React Router, Tailwind, Framer Motion,
-  React Flow (`@xyflow/react`), Recharts, TanStack Query, i18next
+- **client/** — Vite + React + TypeScript, React Router, Tailwind,
+  React Flow (`@xyflow/react`), TanStack Query, i18next
 - **server/** — Express + TypeScript + Mongoose, JWT auth (httpOnly cookie), zod validation
 - **shared/** — shared TypeScript types
 - **DB** — MongoDB Atlas (free tier)
 
 ## TDAIM foundation
 
-RoadAtlas follows **TDAIM** (Theme-Direction-Aware Modular Incremental Model): theme and
-direction awareness are day-one concerns.
+RoadAtlas follows **TDAIM** (Theme- and Direction-Aware Incremental Model, practiced through
+modular development): theme and direction awareness are day-one concerns.
 
 - **Themes** — `dark` (default), `light` and `ocean` via semantic CSS variables + a `data-theme`
   attribute, exposed to Tailwind through `@theme inline`. Use tokens (`bg-base`, `bg-surface`,
@@ -23,7 +23,8 @@ direction awareness are day-one concerns.
 - **Direction** — English + Arabic with RTL/LTR driven by logical CSS properties
   (`ps-*`, `pe-*`, `ms-*`, `me-*`, `text-start`). Toggle in the header; persisted to localStorage.
 
-See [`docs/`](./docs/README.md) for ADRs and the source research.
+See [`docs/`](./docs/README.md) for the [product vision and delivery plan](./docs/product-vision-and-delivery.md),
+ADRs, page specs, and the founding [research conversation](./docs/research/react-native-vs-kmp.md).
 
 ## Getting started
 

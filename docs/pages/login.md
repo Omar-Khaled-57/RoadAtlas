@@ -4,25 +4,26 @@
 
 ## Purpose
 
-The single admin sign-in that gates every **protected write** (roadmaps, steps, criteria, curves,
-progress, pipelines). Public reads stay open; the server derives the owner from the session — never
-from a client-supplied id (research §3 · [0004](../decisions/0004-domain-model-v2.md)).
+The owner's sign-in that gates every **protected operation** on private resources (roadmaps, steps,
+criteria, curves, progress, pipelines). Publicly visible resources can be read without signing in;
+private reads and all mutations require authorization. The server derives the owner from the session —
+never from a client-supplied id (research §3 · [0004](../decisions/0004-domain-model-v2.md)).
 
 ## Data needs
 
-`User` (or env-backed single-admin check) · auth session (JWT in an httpOnly cookie — [0001](../decisions/0001-project-scope.md)).
+`User` / owner identity · auth session (JWT in an httpOnly cookie — [0001](../decisions/0001-project-scope.md)).
 
 ## Sections
 
 ### 1. Header
 
 - **Purpose:** orient the sign-in.
-- **Content:** product mark + one-line "admin sign-in" label.
+- **Content:** product mark + one-line "owner sign-in" label.
 - **Priority:** P0.
 
 ### 2. Credential form
 
-- **Purpose:** authenticate the admin.
+- **Purpose:** authenticate the owner.
 - **Content:** username/email + password; submit; optional "show/hide password".
 - **Interactions:** submit → session cookie; on success redirect to `returnTo` or `/`.
 - **States:** default · submitting (disabled + spinner) · **error** (invalid credentials, no detail leak) · success.
@@ -42,5 +43,6 @@ from a client-supplied id (research §3 · [0004](../decisions/0004-domain-model
 
 ## Notes
 
-- Research suggests not building elaborate custom auth in increment 1; this is a **minimal**
-  single-admin gate, not a full auth product. Rate limiting on the endpoint (research §3).
+- Start with the simplest secure owner authentication that fits the first release; keep identity and
+  ownership explicit so adding users later does not require a data migration. Rate limit the endpoint
+  (research §3).

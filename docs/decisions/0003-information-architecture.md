@@ -54,7 +54,7 @@ Nav + footer are **global chrome**, not content sections — see
 | ----------------------------- | -------------------------------------------------- | -------- |
 | `/`                           | Home — the sectioned overview above                | P0       |
 | `/roadmaps` · `/roadmaps/:id` | Roadmap catalog · a single roadmap (steps)         | P0       |
-| `/login`                      | Admin sign-in (guards protected writes)            | P0       |
+| `/login`                      | Owner sign-in (guards private reads and writes)    | P0       |
 | `*`                           | 404 / not-found                                    | P0       |
 | `/map`                        | Full interactive hub map (React Flow)              | P1       |
 | `/about`                      | About / TDAIM philosophy                           | P1       |
@@ -85,5 +85,5 @@ above (see [`docs/pages/`](../pages/README.md)).
   localStorage); reserved routes (`/knowledge`, `/decisions`, `/search`) are shown as **"coming soon"**.
 - Each page and each section carries a **priority (P0 MVP / P1 Core / P2 Reserved)**; nav/footer order
   is derived from these once all specs exist (see [`docs/pages/`](../pages/README.md)).
-- **Open question:** whether the hero's `Focus` is visible to visitors (portfolio view) or admin-only —
+- **Open question:** whether the hero's `Focus` is visible to visitors (portfolio view) or owner-only —
   governed by `Focus.visibility` (see [`home`](../pages/home.md)).

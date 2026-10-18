@@ -13,15 +13,12 @@
     "@tanstack/react-query": "*",
     "@xyflow/react": "*",
     "axios": "*",
-    "framer-motion": "*",
     "i18next": "^26.4.5",
     "lucide-react": "*",
     "react": "*",
     "react-dom": "*",
     "react-i18next": "^17.0.16",
-    "react-markdown": "*",
-    "react-router-dom": "*",
-    "recharts": "*"
+    "react-router-dom": "*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "*",

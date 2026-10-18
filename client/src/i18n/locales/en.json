@@ -1,25 +1,125 @@
 {
-  "app": { "name": "RoadAtlas" },
+  "app": {
+    "name": "RoadAtlas"
+  },
   "nav": {
-    "dashboard": "Dashboard",
     "map": "Hub Map",
     "compare": "Compare",
     "pipelines": "Pipelines",
     "roadmaps": "Roadmaps",
     "login": "Log in",
+    "logout": "Log out",
     "openMenu": "Open menu",
     "closeMenu": "Close menu"
   },
-  "health": { "online": "API online", "offline": "API offline" },
-  "placeholder": { "comingSoon": "Phase 1 scaffold — coming soon." },
+  "health": {
+    "online": "API online",
+    "offline": "API offline"
+  },
+  "placeholder": {
+    "comingSoon": "Phase 1 scaffold — coming soon."
+  },
   "pages": {
-    "dashboard": "Dashboard",
-    "map": "Hub / branching roadmap",
     "compare": "Comparison",
     "pipelines": "Projects pipeline",
-    "roadmaps": "Roadmap catalog",
-    "login": "Log in",
+    "about": "About",
     "notFound": "Not found"
+  },
+  "auth": {
+    "title": "Welcome back",
+    "description": "Sign in to continue your private roadmap work.",
+    "email": "Email address",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "invalid": "That email and password did not match.",
+    "unavailable": "Sign-in is not configured on this server yet.",
+    "connectionError": "Could not reach the server. Check your connection and try again."
+  },
+  "map": {
+    "eyebrow": "The big picture",
+    "title": "Your hub map",
+    "subtitle": "How your roadmaps branch and run in parallel — follow a track, jump between branches, and see what's next.",
+    "legend": "Node kinds",
+    "minimap": "Map overview",
+    "detail": "Roadmap details",
+    "loading": "Loading map…",
+    "close": "Close details",
+    "open": "Open roadmap",
+    "progress": "{{value}}% complete",
+    "steps": "{{value}} steps",
+    "kind": {
+      "hub": "Hub",
+      "tech": "Technology",
+      "pipeline": "Pipeline"
+    },
+    "empty": {
+      "title": "No roadmaps yet",
+      "body": "Create your first roadmap to start mapping your journey.",
+      "cta": "Browse roadmaps"
+    }
+  },
+  "common": {
+    "loading": "Loading…"
+  },
+  "roadmaps": {
+    "eyebrow": "The catalog",
+    "title": "Roadmaps",
+    "subtitle": "Every track you're following — filter by kind or status, then open one to see its steps.",
+    "count": "{{value}} roadmaps",
+    "filters": "Filters",
+    "filterKind": "Kind",
+    "filterStatus": "Status",
+    "all": "All",
+    "kind": {
+      "hub": "Hub",
+      "tech": "Technology",
+      "pipeline": "Pipeline"
+    },
+    "status": {
+      "planned": "Planned",
+      "in-progress": "In progress",
+      "completed": "Completed",
+      "paused": "Paused"
+    },
+    "steps": "{{value}} steps",
+    "updated": "Updated {{date}}",
+    "open": "Open roadmap:",
+    "progress": "{{value}}% complete",
+    "progressLabel": "Progress",
+    "empty": {
+      "title": "No roadmaps yet",
+      "body": "Create your first roadmap to start mapping your journey.",
+      "cta": "Browse the map"
+    },
+    "emptyFiltered": {
+      "title": "Nothing matches these filters",
+      "body": "Try a different kind or status.",
+      "cta": "Clear filters"
+    },
+    "notFound": {
+      "title": "Roadmap not found",
+      "body": "That roadmap doesn't exist or may have been removed.",
+      "cta": "Back to the catalog"
+    },
+    "backToCatalog": "All roadmaps",
+    "partOf": "Part of",
+    "overview": "Overview",
+    "topics": "Topics",
+    "prerequisites": "Prerequisites",
+    "noPrerequisites": "No prerequisites — start anywhere.",
+    "stepsTitle": "Steps",
+    "noSteps": "No steps defined yet.",
+    "branch": "Branches from here",
+    "stage": {
+      "idea": "Idea",
+      "design": "Design",
+      "build": "Build",
+      "ship": "Ship",
+      "done": "Done"
+    },
+    "stepDone": "Completed",
+    "stepTodo": "Not started"
   },
   "theme": {
     "name": "Theme",
@@ -28,7 +128,10 @@
     "light": "Light",
     "ocean": "Ocean"
   },
-  "language": { "switch": "Switch language", "name": "English" },
+  "language": {
+    "switch": "Switch language",
+    "name": "English"
+  },
   "home": {
     "kicker": "Your learning universe, in focus",
     "title": "Build your path.",
@@ -69,16 +172,18 @@
     "pipelineTitle": "Follow project pipelines",
     "aboutEyebrow": "How it works",
     "aboutTitle": "The RoadAtlas approach",
-    "footer": "A map for what you’re becoming.",
-    "footerNote": "Progress is saved as you go.",
     "backHome": "Back to overview",
     "badge": "Atlas",
     "complete": "{{value}}% complete",
-    "copyright": "© {{year}} RoadAtlas",
     "focusTechValue": "React & TypeScript",
     "focusProjectValue": "RoadAtlas platform",
     "nextMilestoneValue": "Ship the roadmap hub",
-    "orbit": { "track": "Track", "learn": "Learn", "combine": "Combine", "pick": "Pick" },
+    "orbit": {
+      "track": "Track",
+      "learn": "Learn",
+      "combine": "Combine",
+      "pick": "Pick"
+    },
     "sketch": {
       "label": "Roadmap branching map",
       "hub": "Hub",
@@ -103,5 +208,15 @@
       "cloudSteps": "15 steps"
     },
     "days": ["M", "T", "W", "T", "F", "S", "S"]
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "Sorry, we couldn't render this page. Try again or return home.",
+    "backHome": "Back home"
+  },
+  "footer": {
+    "copyright": "© {{year}} RoadAtlas",
+    "tagline": "A map for what you’re becoming.",
+    "note": "Progress is saved as you go."
   }
 }

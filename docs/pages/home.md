@@ -4,7 +4,7 @@
 
 ## Purpose
 
-The welcoming entry point. It orients a first-time visitor and gives the admin a fast path back to
+The welcoming entry point. It orients a first-time visitor and gives the owner a fast path back to
 where they left off. Home is a **teaser hub** — every section previews a fuller page and links to it.
 
 ## Global chrome
@@ -39,11 +39,11 @@ destinations, ordered by priority.
 
 ### 3. Continue where you left off
 
-- **Purpose:** one-click resume for the admin.
+- **Purpose:** one-click resume for the owner.
 - **Content:** last visited roadmap + step, with progress. **Per owner** (`Focus.lastVisited` +
   `Progress` in the DB).
 - **Interactions:** resumes the roadmap/step; a dismiss control.
-- **States:** default · hidden for non-admins or when there is no progress.
+- **States:** default · hidden from visitors or when there is no owner progress.
 - **Priority:** P0.
 
 ### 4. Hub map preview
@@ -85,6 +85,6 @@ destinations, ordered by priority.
 
 ## Notes
 
-- Focus cards read from `Focus` ([0004](../decisions/0004-domain-model-v2.md)). Whether visitors see
-  them depends on `Focus.visibility`; if it is private, show a curated/static fallback (portfolio view).
-- Continue uses `Focus.lastVisited` and is always per owner (admin).
+- Focus cards read from `Focus` ([0004](../decisions/0004-domain-model-v2.md)). Visitors see them
+  only when the focus record is explicitly public; otherwise show a curated/static portfolio fallback.
+- Continue uses `Focus.lastVisited` and is always private to its owner.

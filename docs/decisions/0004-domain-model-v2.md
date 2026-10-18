@@ -31,16 +31,20 @@ stands only as history.
 
 **Ownership (all user-owned entities).** Add `ownerId: ObjectId` to `Roadmap`, `Step`, `Comparison`,
 `Metric`, `Note`, `DecisionRecord`, `Progress`, `Focus`. **The server derives the owner from the
-verified session, never from a client-supplied id** (research §3). Single admin today; no schema
-change needed for multi-user later.
+verified session, never from a client-supplied id** (research §3). One owner uses the first release;
+no ownership schema change is needed to add more users later.
 
 **Localized content.** Introduce `LocalizedString = { en: string; ar?: string }` and use it for every
 human-readable field: `Roadmap.title/description`, `Step.title`, `Metric.finding`,
 `Comparison.title/conclusion`, `Criterion.name`, `Note.title/content`, `DecisionRecord.*`. `ar` falls back
 to `en` when absent. Dates/numbers are locale-formatted at render, not stored localized.
 
-**Visibility.** Add `visibility: 'public' | 'private'` (default `public`) to `Roadmap`, `Comparison`,
-`Metric`, `Note`, `DecisionRecord`, `Focus`. Public read serves the portfolio; writes stay admin-only.
+**Visibility.** Add `visibility: 'public' | 'private'` (default `private`) to `Roadmap`, `Comparison`,
+`Metric`, `Note`, `DecisionRecord`, `Focus`. Public read serves explicitly published portfolio
+content. The owner can change visibility; private content is never exposed through public endpoints.
+All mutations require authentication and resource-level authorization. The authenticated owner is
+derived by the server, never accepted from the client as authority. This matches the deployed,
+personal-first and multi-user-ready scope in [0001](./0001-project-scope.md).
 
 **Timestamps.** `createdAt` / `updatedAt` on every entity (research §3).
 
@@ -80,8 +84,8 @@ consequences, revisitAt, links[], createdAt, updatedAt)` — backs the reserved 
 ## Consequences
 
 - [0001](./0001-project-scope.md) data-model line is superseded by this ADR.
-- Every write API must enforce `ownerId` + `visibility` (owner from session; public read allowed,
-  writes admin-only) — see research §3 "Authorization from day one".
+- Every API operation must enforce `ownerId` + `visibility` (owner from session; public read only
+  for explicitly public resources) — see research §3 "Authorization from day one".
 - Localized content means API responses are locale-aware (request locale or per-field `{en, ar}`).
 - Adding a language later = extend `LocalizedString`; no structural rewrite (TDAIM).
 - Slightly more upfront modeling; avoids the expensive retrofits called out above.
@@ -89,4 +93,4 @@ consequences, revisitAt, links[], createdAt, updatedAt)` — backs the reserved 
 ## Open questions
 
 - Is `Focus` per-owner singleton, or a small history (recent list)?
-- Do we expose a public `Focus` ("now" card) or keep it admin-only with a curated public fallback?
+- Do we expose a public `Focus` ("now" card) or keep it owner-only with a curated public fallback?
