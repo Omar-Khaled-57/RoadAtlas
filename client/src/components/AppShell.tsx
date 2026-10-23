@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import type { AuthSession, HealthResponse } from '@shared/index';
@@ -48,6 +49,7 @@ export function AppShell() {
   useDocumentDirection();
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuMounted, setMenuMounted] = useState(false);
   const { data: session } = useQuery({
     queryKey: ['session'],
     queryFn: async () => (await api.get<AuthSession>('/api/auth/session')).data,
@@ -66,6 +68,10 @@ export function AppShell() {
     { to: '/decisions', label: t('nav.decisions'), icon: FileText },
     { to: '/search', label: t('nav.search'), icon: Search },
   ];
+  const openMenu = () => {
+    setMenuMounted(true);
+    window.requestAnimationFrame(() => setMenuOpen(true));
+  };
   const closeMenu = () => setMenuOpen(false);
   useEffect(() => {
     if (!menuOpen) return;
@@ -75,6 +81,12 @@ export function AppShell() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [menuOpen]);
+  useEffect(() => {
+    if (menuOpen || !menuMounted) return;
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timeout = window.setTimeout(() => setMenuMounted(false), reducedMotion ? 0 : 320);
+    return () => window.clearTimeout(timeout);
+  }, [menuOpen, menuMounted]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -149,7 +161,7 @@ export function AppShell() {
             <ThemeToggle />
             <button
               type="button"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => (menuOpen ? closeMenu() : openMenu())}
               aria-expanded={menuOpen}
               aria-controls="mobile-nav"
               aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
@@ -159,92 +171,90 @@ export function AppShell() {
             </button>
           </div>
         </div>
-        {menuOpen && (
-          <>
-            <button
-              type="button"
-              aria-label={t('nav.closeMenu')}
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden"
-              onClick={closeMenu}
-            />
-            <nav
-              id="mobile-nav"
-              className="fixed inset-y-0 end-0 z-50 w-[min(85vw,320px)] border-s border-border-subtle bg-bg-base/98 shadow-2xl backdrop-blur-xl lg:hidden motion-reduce:transition-none"
-              style={{
-                animation: 'slideInRight 300ms ease-out',
-                paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
-              }}
-            >
-              <div className="mx-auto flex h-full flex-col gap-1 px-5 pb-6 pt-2 sm:px-6">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-fg-primary">{t('app.name')}</span>
-                  <button
-                    type="button"
-                    onClick={closeMenu}
-                    aria-label={t('nav.closeMenu')}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border-strong bg-surface text-fg-primary transition hover:bg-surface-hover"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                {nav.map(({ to, label, icon: Icon }) => (
-                  <Link
-                    key={to}
-                    to={to}
-                    onClick={closeMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-fg-muted transition hover:bg-surface-hover hover:text-fg-primary"
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Link>
-                ))}
-                <div className="mt-auto flex items-center gap-2 border-t border-border-subtle pt-3 sm:hidden">
-                  <span className="inline-flex">
-                    <LanguageToggle />
-                  </span>
-                  {session?.authenticated ? (
+        {menuMounted &&
+          createPortal(
+            <>
+              <button
+                type="button"
+                aria-label={t('nav.closeMenu')}
+                className={`mobile-nav-backdrop fixed inset-0 z-[60] bg-black/45 backdrop-blur-[2px] lg:hidden ${menuOpen ? 'is-open' : ''}`}
+                onClick={closeMenu}
+              />
+              <nav
+                id="mobile-nav"
+                className={`mobile-nav-panel fixed inset-y-0 end-0 z-[70] w-[min(88vw,360px)] border-s border-border-subtle bg-surface-solid shadow-2xl lg:hidden ${menuOpen ? 'is-open' : ''}`}
+                style={{
+                  paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
+                  background: 'var(--surface-solid)',
+                }}
+              >
+                <div className="mx-auto flex h-full flex-col px-5 pb-6 pt-2 sm:px-6">
+                  <div className="mb-6 flex items-center justify-between border-b border-border-subtle pb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="brand-mark h-10 w-10"><MapPinned className="h-5 w-5" /></span>
+                      <span className="text-base font-bold tracking-tight text-fg-primary">{t('app.name')}</span>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        closeMenu();
-                        logout.mutate();
-                      }}
-                      disabled={logout.isPending}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover disabled:opacity-60"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="text-xs font-medium">{t('nav.logout')}</span>
-                    </button>
-                  ) : (
-                    <Link
-                      to="/login"
                       onClick={closeMenu}
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover"
+                      aria-label={t('nav.closeMenu')}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border-strong bg-surface text-fg-primary transition hover:bg-surface-hover"
                     >
-                      <LogIn className="h-4 w-4" />
-                      <span className="text-xs font-medium">{t('nav.login')}</span>
-                    </Link>
-                  )}
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="mobile-nav-links flex flex-col gap-2">
+                  {nav.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      onClick={closeMenu}
+                      className={({ isActive }) => `mobile-nav-link flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm font-medium transition ${isActive ? 'is-active' : ''}`}
+                    >
+                      <span className="mobile-nav-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-primary"><Icon className="h-[18px] w-[18px]" /></span>
+                      <span className="flex-1">{label}</span>
+                      <span className="mobile-nav-indicator h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-opacity" />
+                    </NavLink>
+                  ))}
+                  </div>
+                  <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+                    <span className="inline-flex">
+                      <LanguageToggle />
+                    </span>
+                    {session?.authenticated ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeMenu();
+                          logout.mutate();
+                        }}
+                        disabled={logout.isPending}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover disabled:opacity-60"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span className="text-xs font-medium">{t('nav.logout')}</span>
+                      </button>
+                    ) : (
+                      <Link
+                        to="/login"
+                        onClick={closeMenu}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover"
+                      >
+                        <LogIn className="h-4 w-4" />
+                        <span className="text-xs font-medium">{t('nav.login')}</span>
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </nav>
-            <style>{`
-              @keyframes slideInRight {
-                from { transform: translateX(100%); }
-                to { transform: translateX(0); }
-              }
-              @keyframes slideInLeft {
-                from { transform: translateX(-100%); }
-                to { transform: translateX(0); }
-              }
-              [dir="rtl"] nav[id="mobile-nav"] {
-                animation: slideInLeft 300ms ease-out;
-              }
-            `}</style>
-          </>
-        )}
+              </nav>
+            </>,
+            document.body,
+          )}
       </header>
-      <main id="main-content" className="relative z-10 mx-auto max-w-7xl space-y-7 px-5 pt-6 sm:px-8">
+      <main
+        id="main-content"
+        className="relative z-10 mx-auto max-w-7xl space-y-7 px-5 pt-6 sm:px-8"
+      >
         <Outlet />
       </main>
       <footer className="relative mx-auto mt-7 max-w-7xl px-5 pb-16 sm:px-8">

@@ -175,7 +175,7 @@ export interface CurveEvidence {
 
 export const evidenceLinks: CurveEvidence[] = [
   {
-    url: 'https://opencode.ai',
-    label: t('opencode docs', 'وثائق opencode'),
+    url: 'https://developer.android.com/develop',
+    label: t('android docs', 'وثائق android'),
   },
 ];
