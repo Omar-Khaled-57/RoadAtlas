@@ -226,6 +226,50 @@ export const seedRoadmaps: RoadmapSeed[] = [
     ],
   }),
   makeRoadmap({
+    id: 'r-atlas-web',
+    kind: 'pipeline',
+    order: 1,
+    title: t('Marketing site revamp', 'تجديد موقع التسويق'),
+    description: t(
+      'Rebuild the public site on the new design system, from copy to launch.',
+      'إعادة بناء الموقع العام على نظام التصميم الجديد، من النص حتى الإطلاق.',
+    ),
+    topics: [t('Web', 'الويب'), t('Design', 'التصميم')],
+    steps: [
+      { title: t('Audit the current site', 'تدقيق الموقع الحالي'), stage: 'idea', done: true },
+      {
+        title: t('Draft the new sitemap', 'مسودة خريطة الموقع الجديدة'),
+        stage: 'design',
+        done: true,
+      },
+      {
+        title: t('Build the component library', 'بناء مكتبة المكوّنات'),
+        stage: 'build',
+        done: true,
+      },
+      { title: t('Migrate the content', 'ترحيل المحتوى'), stage: 'build' },
+      { title: t('Launch and redirect', 'الإطلاق وإعادة التوجيه'), stage: 'ship' },
+      { title: t('Monitor and iterate', 'المراقبة والتحسين'), stage: 'done' },
+    ],
+  }),
+  makeRoadmap({
+    id: 'r-atlas-mobile',
+    kind: 'pipeline',
+    order: 1,
+    title: t('Companion mobile app', 'تطبيق الجوال المرافق'),
+    description: t(
+      'A pocket companion for tracking roadmaps on the go, from research to the stores.',
+      'رفيق جيب لمتابعة خرائط الطريق أثناء التنقّل، من البحث إلى المتاجر.',
+    ),
+    prerequisites: [t('API access', 'الوصول إلى الواجهة البرمجية')],
+    steps: [
+      { title: t('Research user needs', 'بحث احتياجات المستخدم'), stage: 'idea' },
+      { title: t('Sketch the key flows', 'رسم المسارات الأساسية'), stage: 'design' },
+      { title: t('Ship a beta to testers', 'إطلاق نسخة تجريبية للمختبِرين'), stage: 'build' },
+      { title: t('Store submission', 'الإرسال إلى المتاجر'), stage: 'ship' },
+    ],
+  }),
+  makeRoadmap({
     id: 'r-flutter',
     kind: 'tech',
     order: 1,
@@ -283,6 +327,24 @@ export const seedRoadmaps: RoadmapSeed[] = [
     ],
   }),
 ];
+
+export const PIPELINE_STAGES: PipelineStage[] = ['idea', 'design', 'build', 'ship', 'done'];
+
+/** The stage of the first unfinished step, or the last stage once everything is done. */
+export function currentStage(roadmap: RoadmapSeed): PipelineStage | undefined {
+  const staged = roadmap.steps.filter((step) => step.stage);
+  if (staged.length === 0) return undefined;
+  const next = staged.find((step) => !step.done);
+  return next?.stage ?? PIPELINE_STAGES[PIPELINE_STAGES.length - 1];
+}
+
+export function stageSteps(roadmap: RoadmapSeed, stage: PipelineStage): RoadmapStep[] {
+  return roadmap.steps.filter((step) => step.stage === stage);
+}
+
+export function pipelineRoadmaps(): RoadmapSeed[] {
+  return seedRoadmaps.filter((roadmap) => roadmap.kind === 'pipeline');
+}
 
 export function roadmapProgress(roadmap: RoadmapSeed): number {
   if (roadmap.steps.length === 0) return 0;

@@ -53,6 +53,11 @@ The API boots even without a `MONGODB_URI` set (Phase 1 stub) so the scaffold ru
 | `npm run lint`      | ESLint                       |
 | `npm run format`    | Prettier write               |
 
+## Operations
+
+Production setup, structured logs/request ids, health, provisioning, and backup/restore are covered in
+[`docs/operations.md`](./docs/operations.md).
+
 ## Notes
 
 - The local `dev/` folder is git-ignored (scratch/experiments).

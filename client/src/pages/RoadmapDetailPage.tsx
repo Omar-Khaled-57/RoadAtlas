@@ -1,8 +1,11 @@
-import { ArrowDownLeft, ArrowRight, Check, Circle } from 'lucide-react';
+import { ArrowDownLeft, ArrowRight, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { usePageMeta } from '../lib/seo';
+
 import { Link, useParams } from 'react-router-dom';
 import { ProgressRing } from '../components/ProgressRing';
 import { KindBadge, StatusBadge } from '../components/RoadmapBadges';
+import { OwnerRoadmapDetail } from '../components/OwnerRoadmapDetail';
 import { RoadmapCard } from '../components/RoadmapCard';
 import {
   childRoadmaps,
@@ -15,10 +18,19 @@ import { localize } from '../lib/localize';
 import { KIND_ICON, KIND_TONE } from '../lib/roadmapMeta';
 
 export function RoadmapDetailPage() {
+  usePageMeta({
+    titleKey: 'seo.roadmapDetail.title',
+    descriptionKey: 'seo.roadmapDetail.description',
+  });
   const { t, i18n } = useTranslation();
   const { id } = useParams();
   const lang = i18n.language;
   const roadmap = getRoadmap(id);
+
+  // Roadmaps the API owns use Mongo ids; the catalogue below uses readable slugs.
+  if (!roadmap && id && /^[a-f\d]{24}$/i.test(id)) {
+    return <OwnerRoadmapDetail id={id} />;
+  }
 
   if (!roadmap) {
     return (
@@ -43,6 +55,7 @@ export function RoadmapDetailPage() {
   const Icon = KIND_ICON[roadmap.kind];
   const parent = getRoadmap(roadmap.parentId);
   const children = childRoadmaps(roadmap.id);
+  const currentIndex = roadmap.steps.findIndex((step) => !step.done);
 
   return (
     <div className="page-enter space-y-6">
@@ -127,15 +140,27 @@ export function RoadmapDetailPage() {
 
       <section className="surface-card p-6">
         <div className="flex items-end justify-between gap-4">
-          <h2 className="text-lg font-bold">{t('roadmaps.stepsTitle')}</h2>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[.14em] text-fg-muted">
+              {t('roadmaps.route')}
+            </p>
+            <h2 className="mt-1 text-lg font-bold">{t('roadmaps.stepsTitle')}</h2>
+          </div>
           <p className="text-xs text-fg-muted">
             {t('roadmaps.steps', { value: roadmap.steps.length })}
           </p>
         </div>
         {roadmap.steps.length > 0 ? (
-          <ol className="mt-5 list-none space-y-3 p-0">
-            {roadmap.steps.map((step) => (
-              <StepItem key={step.id} step={step} lang={lang} />
+          <ol className="route-list mt-5 list-none p-0">
+            {roadmap.steps.map((step, index) => (
+              <StepItem
+                key={step.id}
+                step={step}
+                index={index}
+                total={roadmap.steps.length}
+                current={index === currentIndex}
+                lang={lang}
+              />
             ))}
           </ol>
         ) : (
@@ -144,7 +169,7 @@ export function RoadmapDetailPage() {
       </section>
 
       {children.length > 0 ? (
-        <section>
+        <section className="surface-card p-5 sm:p-6">
           <h2 className="mb-4 text-lg font-bold">{t('roadmaps.branch')}</h2>
           <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
             {children.map((child) => (
@@ -172,19 +197,29 @@ function BackLink() {
   );
 }
 
-function StepItem({ step, lang }: { step: RoadmapStep; lang: string }) {
+interface StepItemProps {
+  step: RoadmapStep;
+  index: number;
+  total: number;
+  current: boolean;
+  lang: string;
+}
+
+function StepItem({ step, index, total, current, lang }: StepItemProps) {
   const { t } = useTranslation();
   return (
-    <li className={`step-item${step.done ? ' is-done' : ''}`}>
-      <span className="step-item__marker" aria-hidden="true">
-        {step.done ? <Check /> : <Circle />}
+    <li className={`route-stop${step.done ? ' is-done' : ''}${current ? ' is-current' : ''}`}>
+      <span className="route-stop__marker" aria-hidden="true">
+        {step.done ? <Check /> : <span className="route-stop__number">{index + 1}</span>}
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="route-stop__body">
         <div className="flex flex-wrap items-center gap-2">
+          <span className="sr-only">{t('roadmaps.stepIndex', { current: index + 1, total })}</span>
           <h3 className="font-semibold">{localize(step.title, lang)}</h3>
           {step.stage ? (
             <span className="stage-badge">{t(`roadmaps.stage.${step.stage}`)}</span>
           ) : null}
+          {current ? <span className="next-stop-chip">{t('roadmaps.nextStop')}</span> : null}
           <span className="sr-only">
             {step.done ? t('roadmaps.stepDone') : t('roadmaps.stepTodo')}
           </span>

@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# Owner data is private and authenticated; the public catalogue is under /roadmaps,
+# /compare, /curves, /pipelines, /map and /about.
+Disallow: /api/

@@ -2,23 +2,26 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
   Check,
+  FileText,
   GitCompareArrows,
   LogIn,
   LogOut,
   Map,
   MapPinned,
   Menu,
+  Search,
   Workflow,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import type { AuthSession, HealthResponse } from '@shared/index';
 import { api } from '../lib/api';
 import { Background } from './Background';
 import { LanguageToggle } from './LanguageToggle';
 import { ThemeToggle } from './ThemeToggle';
+import { useDocumentDirection } from '../lib/i18nSync';
 
 function HealthBadge() {
   const { t } = useTranslation();
@@ -30,7 +33,10 @@ function HealthBadge() {
   });
   const ok = !isError && data?.status === 'ok';
   return (
-    <span className="hidden items-center gap-2 rounded-full border border-border-default bg-surface px-3 py-1.5 text-xs text-fg-muted sm:inline-flex">
+    <span
+      role="status"
+      className="hidden h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-xs text-fg-muted sm:inline-flex"
+    >
       <span className={`h-2 w-2 rounded-full ${ok ? 'bg-success' : 'bg-error'}`} />
       {ok ? t('health.online') : t('health.offline')}
     </span>
@@ -39,6 +45,7 @@ function HealthBadge() {
 
 export function AppShell() {
   const { t } = useTranslation();
+  useDocumentDirection();
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const { data: session } = useQuery({
@@ -55,15 +62,37 @@ export function AppShell() {
     { to: '/map', label: t('nav.map'), icon: Map },
     { to: '/compare', label: t('nav.compare'), icon: GitCompareArrows },
     { to: '/pipelines', label: t('nav.pipelines'), icon: Workflow },
+    { to: '/knowledge', label: t('nav.knowledge'), icon: BookOpen },
+    { to: '/decisions', label: t('nav.decisions'), icon: FileText },
+    { to: '/search', label: t('nav.search'), icon: Search },
   ];
   const closeMenu = () => setMenuOpen(false);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        window.location.assign('/search');
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
     <div className="relative min-h-screen text-fg-primary">
       <Background />
-      <header className="sticky top-0 z-30 border-b border-border-subtle bg-bg-base/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4 sm:px-8">
-          <Link to="/" className="flex shrink-0 items-center gap-3" onClick={closeMenu}>
-            <span className="brand-mark">
+      <header className="sticky top-0 z-50 border-b border-border-subtle bg-bg-base/90 shadow-sm shadow-fg-primary/5 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3 sm:px-8 sm:py-3.5 xl:flex-nowrap">
+          <Link to="/" className="group flex shrink-0 items-center gap-3" onClick={closeMenu}>
+            <span className="brand-mark transition-transform duration-200 group-hover:-rotate-3">
               <MapPinned className="h-5 w-5" />
             </span>
             <span className="text-lg font-bold tracking-tight">
@@ -73,19 +102,25 @@ export function AppShell() {
               </span>
             </span>
           </Link>
-          <nav className="hidden shrink-0 items-center gap-0.5 lg:flex">
+          <nav className="hidden shrink-0 items-center gap-0.5 lg:ms-2 lg:flex xl:ms-4">
             {nav.map(({ to, label, icon: Icon }) => (
-              <Link
+              <NavLink
                 key={to}
                 to={to}
-                className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm text-fg-muted transition hover:bg-surface-hover hover:text-fg-primary"
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 rounded-xl px-2 py-2 text-sm transition-colors duration-200 ${
+                    isActive
+                      ? 'bg-primary-soft text-primary'
+                      : 'text-fg-muted hover:bg-surface-hover hover:text-fg-primary'
+                  }`
+                }
               >
-                <Icon className="hidden h-4 w-4 shrink-0 xl:block" />
+                <Icon className="hidden h-4 w-4 shrink-0 opacity-80 xl:block" />
                 {label}
-              </Link>
+              </NavLink>
             ))}
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="ms-auto flex shrink-0 items-center gap-1.5 xl:gap-2">
             <HealthBadge />
             {session?.authenticated ? (
               <button
@@ -125,57 +160,95 @@ export function AppShell() {
           </div>
         </div>
         {menuOpen && (
-          <nav
-            id="mobile-nav"
-            className="border-t border-border-subtle bg-bg-base/95 backdrop-blur-xl lg:hidden"
-          >
-            <div className="mx-auto flex max-w-7xl flex-col gap-1 px-5 py-3 sm:px-8">
-              {nav.map(({ to, label, icon: Icon }) => (
-                <Link
-                  key={to}
-                  to={to}
-                  onClick={closeMenu}
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-fg-muted transition hover:bg-surface-hover hover:text-fg-primary"
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </Link>
-              ))}
-              <div className="mt-2 flex items-center gap-2 border-t border-border-subtle pt-3 sm:hidden">
-                <span className="inline-flex">
-                  <LanguageToggle />
-                </span>
-                {session?.authenticated ? (
+          <>
+            <button
+              type="button"
+              aria-label={t('nav.closeMenu')}
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] lg:hidden"
+              onClick={closeMenu}
+            />
+            <nav
+              id="mobile-nav"
+              className="fixed inset-y-0 end-0 z-50 w-[min(85vw,320px)] border-s border-border-subtle bg-bg-base/98 shadow-2xl backdrop-blur-xl lg:hidden motion-reduce:transition-none"
+              style={{
+                animation: 'slideInRight 300ms ease-out',
+                paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
+              }}
+            >
+              <div className="mx-auto flex h-full flex-col gap-1 px-5 pb-6 pt-2 sm:px-6">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-fg-primary">{t('app.name')}</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      closeMenu();
-                      logout.mutate();
-                    }}
-                    disabled={logout.isPending}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover disabled:opacity-60"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span className="text-xs font-medium">{t('nav.logout')}</span>
-                  </button>
-                ) : (
-                  <Link
-                    to="/login"
                     onClick={closeMenu}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover"
+                    aria-label={t('nav.closeMenu')}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border-strong bg-surface text-fg-primary transition hover:bg-surface-hover"
                   >
-                    <LogIn className="h-4 w-4" />
-                    <span className="text-xs font-medium">{t('nav.login')}</span>
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                {nav.map(({ to, label, icon: Icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-fg-muted transition hover:bg-surface-hover hover:text-fg-primary"
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
                   </Link>
-                )}
+                ))}
+                <div className="mt-auto flex items-center gap-2 border-t border-border-subtle pt-3 sm:hidden">
+                  <span className="inline-flex">
+                    <LanguageToggle />
+                  </span>
+                  {session?.authenticated ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMenu();
+                        logout.mutate();
+                      }}
+                      disabled={logout.isPending}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover disabled:opacity-60"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="text-xs font-medium">{t('nav.logout')}</span>
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      onClick={closeMenu}
+                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover"
+                    >
+                      <LogIn className="h-4 w-4" />
+                      <span className="text-xs font-medium">{t('nav.login')}</span>
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-          </nav>
+            </nav>
+            <style>{`
+              @keyframes slideInRight {
+                from { transform: translateX(100%); }
+                to { transform: translateX(0); }
+              }
+              @keyframes slideInLeft {
+                from { transform: translateX(-100%); }
+                to { transform: translateX(0); }
+              }
+              [dir="rtl"] nav[id="mobile-nav"] {
+                animation: slideInLeft 300ms ease-out;
+              }
+            `}</style>
+          </>
         )}
       </header>
-      <main className="relative z-10 mx-auto max-w-7xl space-y-7 px-5 pb-16 pt-6 sm:px-8">
+      <main id="main-content" className="relative z-10 mx-auto max-w-7xl space-y-7 px-5 pt-6 sm:px-8">
         <Outlet />
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-5 text-xs text-fg-muted">
+      </main>
+      <footer className="relative mx-auto mt-7 max-w-7xl px-5 pb-16 sm:px-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-surface px-4 py-3 text-xs text-fg-muted">
           <span>
             {t('footer.copyright', { year: 2026 })} · {t('footer.tagline')}
           </span>
@@ -183,8 +256,8 @@ export function AppShell() {
             <Check className="h-3.5 w-3.5 text-success" />
             {t('footer.note')}
           </span>
-        </footer>
-      </main>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -1,9 +1,9 @@
-import { Router, type RequestHandler } from 'express';
+import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
-import { env } from '../config/env';
 import {
   authenticateOwner,
+  authConfigured,
   createSessionToken,
   readSession,
   SESSION_COOKIE,
@@ -23,33 +23,23 @@ const credentialsSchema = z.object({
   password: z.string().min(1).max(200),
 });
 
-const checkOrigin: RequestHandler = (req, res, next) => {
-  const origin = req.get('origin');
-  if (origin && origin !== env.CLIENT_ORIGIN) {
-    res.status(403).json({ message: 'Request origin is not allowed.' });
-    return;
+authRouter.get('/session', async (req, res, next) => {
+  try {
+    const user = await readSession(req.cookies?.[SESSION_COOKIE]);
+    res.json({ authenticated: Boolean(user), user });
+  } catch (error) {
+    next(error);
   }
-  next();
-};
-
-authRouter.get('/session', (req, res) => {
-  const user = readSession(req.cookies?.[SESSION_COOKIE]);
-  res.json({ authenticated: Boolean(user), user });
 });
 
-authRouter.post('/login', loginLimiter, checkOrigin, async (req, res, next) => {
+authRouter.post('/login', loginLimiter, async (req, res, next) => {
   const parsed = credentialsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: 'Enter a valid email and password.' });
     return;
   }
 
-  if (
-    !env.JWT_SECRET ||
-    env.JWT_SECRET.length < 32 ||
-    !env.ADMIN_EMAIL ||
-    !env.ADMIN_PASSWORD_HASH
-  ) {
+  if (!authConfigured()) {
     res.status(503).json({ message: 'Sign-in is not configured on this server.' });
     return;
   }
@@ -68,7 +58,7 @@ authRouter.post('/login', loginLimiter, checkOrigin, async (req, res, next) => {
   }
 });
 
-authRouter.post('/logout', checkOrigin, (_req, res) => {
+authRouter.post('/logout', (_req, res) => {
   res.clearCookie(SESSION_COOKIE, sessionCookieOptions(false));
   res.json({ authenticated: false, user: null });
 });

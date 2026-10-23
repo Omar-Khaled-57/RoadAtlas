@@ -3,6 +3,8 @@ import { isAxiosError } from 'axios';
 import { ArrowDownLeft, LoaderCircle, LockKeyhole, Mail, MapPinned } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePageMeta } from '../lib/seo';
+
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { AuthSession, LoginCredentials } from '@shared/index';
 import { api } from '../lib/api';
@@ -12,6 +14,7 @@ function safeReturnPath(value: string | null): string {
 }
 
 export function LoginPage() {
+  usePageMeta({ titleKey: 'seo.login.title', descriptionKey: 'seo.login.description' });
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();

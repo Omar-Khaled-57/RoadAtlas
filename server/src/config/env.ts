@@ -5,11 +5,12 @@ const schema = z
   .object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(4000),
-    CLIENT_ORIGIN: z.string().default('http://localhost:5173'),
+    CLIENT_ORIGIN: z.string().url().optional(),
     MONGODB_URI: z.string().optional(),
     JWT_SECRET: z.string().optional(),
     ADMIN_EMAIL: z.string().email().optional(),
     ADMIN_PASSWORD_HASH: z.string().optional(),
+    LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).optional(),
   })
   .superRefine((values, context) => {
     if (values.JWT_SECRET && values.JWT_SECRET.length < 32) {
@@ -31,16 +32,39 @@ const schema = z
       });
     }
 
+    const adminPair = [values.ADMIN_EMAIL, values.ADMIN_PASSWORD_HASH];
+    if (values.NODE_ENV === 'production' && adminPair.some(Boolean) && !adminPair.every(Boolean)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['ADMIN_EMAIL'],
+        message: 'Set both ADMIN_EMAIL and ADMIN_PASSWORD_HASH, or neither.',
+      });
+    }
+
     if (values.NODE_ENV === 'production') {
-      for (const key of ['JWT_SECRET', 'ADMIN_EMAIL', 'ADMIN_PASSWORD_HASH'] as const) {
+      for (const key of ['CLIENT_ORIGIN', 'JWT_SECRET'] as const) {
         if (!values[key]) {
           context.addIssue({ code: 'custom', path: [key], message: 'Required in production.' });
         }
+      }
+
+      // Without a database the configured administrator is the only account the
+      // server can authenticate; with one, users are provisioned in the database.
+      if (!values.MONGODB_URI && !values.ADMIN_EMAIL) {
+        context.addIssue({
+          code: 'custom',
+          path: ['ADMIN_EMAIL'],
+          message: 'Required in production when MONGODB_URI is not set.',
+        });
       }
     }
   });
 
 const parsed = schema.parse(process.env);
 
-export const env = parsed;
+export const env = {
+  ...parsed,
+  // Only reachable in development/test — production requires CLIENT_ORIGIN explicitly.
+  CLIENT_ORIGIN: parsed.CLIENT_ORIGIN ?? 'http://localhost:5173',
+};
 export const hasDb = Boolean(parsed.MONGODB_URI);

@@ -40,7 +40,7 @@
   --success-soft: #1d405d;
   --warning: #fbbf24;
   --warning-soft: #413d48;
-  --error: #f87171;
+  --error: #fca5a5;
   --error-soft: #402f56;
   --info: #38bdf8;
   --info-soft: #1e3c6e;
@@ -154,7 +154,7 @@
   --success-soft: #124b48;
   --warning: #fbbf24;
   --warning-soft: #354733;
-  --error: #f87171;
+  --error: #fca5a5;
   --error-soft: #353941;
   --info: #38bdf8;
   --info-soft: #124759;
@@ -217,9 +217,10 @@
   --color-grid-line: var(--grid-line);
 
   --font-sans:
-    'Titillium Web', 'Cairo', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
-  --font-arabic: 'Cairo', 'Titillium Web', system-ui, sans-serif;
+    'Titillium Web', 'Titillium Fallback', 'Cairo', system-ui, -apple-system, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-arabic:
+    'Cairo', 'Cairo Fallback', 'Titillium Web', 'Titillium Fallback', system-ui, sans-serif;
 }
 
 html {
@@ -753,9 +754,115 @@ body {
     transform 0.2s ease,
     border-color 0.2s ease;
 }
+.roadmap-card::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background: radial-gradient(
+    130% 85% at 88% -12%,
+    color-mix(in srgb, var(--card-tone) 16%, transparent),
+    transparent 62%
+  );
+}
+.roadmap-card[data-tone='primary'] {
+  --card-tone: var(--primary);
+}
+.roadmap-card[data-tone='secondary'] {
+  --card-tone: var(--secondary);
+}
+.roadmap-card[data-tone='accent'] {
+  --card-tone: var(--accent);
+}
+.roadmap-card--map {
+  min-height: 276px;
+  border-inline-start: 3px solid var(--card-tone);
+  border-radius: 16px;
+  background-color: var(--surface-solid);
+  background-image: radial-gradient(var(--border-subtle) 0.7px, transparent 0.7px);
+  background-size: 18px 18px;
+}
+.roadmap-card--map::before {
+  background: radial-gradient(
+    120% 85% at 88% -12%,
+    color-mix(in srgb, var(--card-tone) 18%, transparent),
+    transparent 65%
+  );
+}
+.roadmap-card--map > * {
+  position: relative;
+}
 .roadmap-card:hover {
   transform: translateY(-3px);
   border-color: var(--border-strong);
+}
+.roadmap-card:hover .roadmap-trail__done {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--trail-tone) 55%, transparent));
+}
+.roadmap-trail {
+  margin-top: 2px;
+}
+.roadmap-trail__canvas {
+  position: relative;
+  height: 56px;
+}
+.roadmap-trail__path {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.roadmap-trail__asphalt {
+  fill: none;
+  stroke: color-mix(in srgb, var(--surface-solid) 58%, var(--surface-active));
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+.roadmap-trail__center {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 7;
+  stroke-linecap: round;
+}
+.roadmap-trail__done {
+  fill: none;
+  stroke: var(--trail-tone);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+.roadmap-trail__stop {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-solid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--surface-solid) 72%, transparent);
+  transform: translate(-50%, -50%);
+}
+.roadmap-trail__stop.is-done {
+  border-color: var(--trail-tone);
+  background: var(--trail-tone);
+}
+.roadmap-trail__stop.is-current {
+  border-color: var(--trail-tone);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--trail-tone) 22%, transparent);
+}
+.roadmap-trail__empty {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  border-block-start: 2px dashed var(--border-default);
+}
+.trail-tone-primary {
+  --trail-tone: var(--primary);
+}
+.trail-tone-secondary {
+  --trail-tone: var(--secondary);
+}
+.trail-tone-accent {
+  --trail-tone: var(--accent);
 }
 .roadmap-icon {
   width: 40px;
@@ -798,11 +905,7 @@ body {
 .stretched-link {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 20px;
-  color: var(--fg-muted);
+  border-radius: 20px;
 }
 .stretched-link:focus-visible {
   outline: 2px solid var(--border-focus);
@@ -966,6 +1069,120 @@ body {
   color: var(--fg-muted);
   font-size: 12px;
   font-style: italic;
+}
+.route-stop {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 16px;
+  padding-block: 8px;
+}
+.route-stop:not(:last-child)::before,
+.route-stop:not(:last-child)::after {
+  position: absolute;
+  z-index: 0;
+  inset-inline-start: 14px;
+  top: 26px;
+  bottom: -26px;
+  width: 8px;
+  content: '';
+  border-radius: 99px;
+}
+.route-stop:not(:last-child)::before {
+  background: color-mix(in srgb, var(--surface-solid) 55%, var(--surface-active));
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+.route-stop:not(:last-child)::after {
+  inset-inline-start: 17px;
+  width: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--border-strong) 0 7px,
+    transparent 7px 14px
+  );
+}
+.route-stop.is-done:not(:last-child)::before {
+  background: color-mix(in srgb, var(--success) 24%, var(--surface-active));
+}
+.route-stop.is-done:not(:last-child)::after {
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--success) 70%, var(--border-strong)) 0 7px,
+    transparent 7px 14px
+  );
+}
+.route-stop__marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--border-default);
+  border-radius: 50%;
+  color: var(--fg-secondary);
+  background: var(--surface-solid);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--surface-solid) 55%, transparent);
+}
+.route-stop__marker svg {
+  width: 15px;
+  height: 15px;
+}
+.route-stop.is-done .route-stop__marker {
+  border-color: color-mix(in srgb, var(--success) 50%, transparent);
+  color: var(--success);
+  background: var(--success-soft);
+}
+.route-stop.is-current .route-stop__marker {
+  border-color: var(--primary);
+  color: var(--primary-fg);
+  background: var(--primary);
+  animation: stop-pulse 2.4s ease-out infinite;
+}
+.route-stop__body {
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 12px 14px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.route-stop__body:hover {
+  border-color: var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-solid) 30%, transparent);
+}
+.route-stop.is-current .route-stop__body {
+  border-color: color-mix(in srgb, var(--primary) 42%, transparent);
+  background: color-mix(in srgb, var(--primary-soft) 45%, transparent);
+}
+.next-stop-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  padding: 2px 8px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+@keyframes stop-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--primary) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-stop.is-current .route-stop__marker {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent);
+  }
 }
 @media (min-width: 768px) {
   .bottom-grid {
@@ -1284,6 +1501,12 @@ body {
   }
 }
 
+/* Arabic script must never be letter-spaced: tracking breaks cursive joining.
+   Unlayered so it also overrides Tailwind `tracking-*` utilities under Arabic. */
+:lang(ar) {
+  letter-spacing: normal;
+}
+
 /* ── Hub map (React Flow) ───────────────────────────────────────────── */
 .map-page {
   display: flex;
@@ -1326,8 +1549,11 @@ body {
   border-radius: 999px;
   background: var(--surface-solid);
   color: var(--fg-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
+}
+.react-flow__attribution {
+  font-size: 12px;
 }
 .map-legend__item svg {
   width: 14px;
@@ -1459,7 +1685,7 @@ body {
   gap: 2px;
 }
 .roadmap-node__kind {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1489,7 +1715,7 @@ body {
   display: flex;
   justify-content: space-between;
   margin-top: 6px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--fg-muted);
 }
 .roadmap-node--hub {
@@ -1526,17 +1752,47 @@ body {
 .map-detail {
   position: fixed;
   z-index: 40;
-  inset-block: 0;
+  inset-block-start: 4.1875rem;
+  inset-block-end: 0;
   inset-inline-end: 0;
   width: min(340px, 92vw);
-  padding: 24px;
+  padding: clamp(16px, 2vw, 24px);
+  padding-block-end: calc(clamp(16px, 2vw, 24px) + env(safe-area-inset-bottom));
   overflow-y: auto;
+  scrollbar-gutter: stable;
   border-inline-start: 1px solid var(--border-default);
   background: var(--surface-solid);
   box-shadow: -20px 0 50px rgb(var(--shadow-rgb) / 0.25);
+  transform: translateX(100%);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 280ms;
+}
+.map-detail.is-open {
+  transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
 }
 [dir='rtl'] .map-detail {
   box-shadow: 20px 0 50px rgb(var(--shadow-rgb) / 0.25);
+  transform: translateX(-100%);
+}
+[dir='rtl'] .map-detail.is-open {
+  transform: translateX(0);
+}
+@media (max-width: 639px) {
+  .map-detail {
+    inset-block-start: 4.1875rem;
+    width: min(340px, 94vw);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-detail {
+    transition: none;
+  }
 }
 .map-detail__head {
   display: flex;
@@ -1590,6 +1846,71 @@ body {
   font-size: 0.75rem;
   color: var(--fg-muted);
 }
+.map-detail__status {
+  margin-top: 8px;
+}
+.map-detail__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.map-detail__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.map-detail__stats strong {
+  font-size: 1.1rem;
+}
+.map-detail__stats span,
+.map-detail__label,
+.map-detail__updated {
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+}
+.map-detail__section {
+  margin-top: 20px;
+}
+.map-detail__label {
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+.map-detail__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.map-detail__related {
+  color: var(--primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.map-detail__related:hover {
+  text-decoration: underline;
+}
+.map-detail__topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.map-detail__topics span {
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: var(--surface);
+  color: var(--fg-secondary);
+  font-size: 0.75rem;
+}
+.map-detail__updated {
+  margin-top: 20px;
+}
 
 @media (max-width: 639px) {
   .map-page__header {
@@ -1598,4 +1919,140 @@ body {
   .map-canvas {
     height: clamp(360px, 60vh, 520px);
   }
+}
+
+.markdown-content {
+  display: grid;
+  gap: 0.9rem;
+  color: var(--fg-primary);
+  line-height: 1.8;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg-primary);
+}
+
+.markdown-content h1 {
+  font-size: 1.8rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.5rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.25rem;
+}
+
+.markdown-content p {
+  color: var(--fg-primary);
+}
+
+.markdown-content a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  display: grid;
+  gap: 0.6rem;
+  padding-inline-start: 1.5rem;
+}
+
+.markdown-content li {
+  color: var(--fg-primary);
+}
+
+.markdown-content code {
+  border-radius: 0.6rem;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  padding: 0.15rem 0.4rem;
+  font-size: 0.9em;
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  border-radius: 1rem;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-solid);
+  padding: 1rem 1.2rem;
+}
+
+.markdown-content pre code {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-content blockquote {
+  border-inline-start: 3px solid var(--primary);
+  padding-inline-start: 1rem;
+  color: var(--fg-muted);
+}
+
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid var(--border-subtle);
+  padding: 0.7rem 0.9rem;
+  text-align: start;
+}
+
+.markdown-content th {
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.tag-chip {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  padding: 0.2rem 0.65rem;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+button.tag-chip {
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+button.tag-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--fg-primary);
+}
+
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  font-size: 1.15rem;
 }

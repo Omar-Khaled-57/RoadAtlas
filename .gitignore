@@ -24,3 +24,6 @@ desktop.ini
 
 # local-only dev scratch (ignored per request)
 /dev/
+
+# database backups (any workspace)
+backups/

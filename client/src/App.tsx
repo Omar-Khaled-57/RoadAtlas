@@ -1,5 +1,5 @@
+import { usePageMeta } from './lib/seo';
 import {
-  ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
   BookOpen,
@@ -21,8 +21,15 @@ import { Link, Route, Routes } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AppShell } from './components/AppShell';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { OwnerFocusPanel } from './components/OwnerFocusPanel';
 import { ProgressRing } from './components/ProgressRing';
 import { seedRoadmaps } from './data/roadmaps';
+import { useFocusView } from './data/focus';
+import { useSetFocus } from './data/queries';
+import { seedComparisons, seedTechProfiles } from './data/comparisons';
+import { seedMetrics } from './data/curves';
+import { localize } from './lib/localize';
 
 const MapPage = lazy(() => import('./pages/MapPage'));
 const RoadmapsPage = lazy(() =>
@@ -34,11 +41,36 @@ const RoadmapDetailPage = lazy(() =>
 const LoginPage = lazy(() =>
   import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })),
 );
+const AboutPage = lazy(() =>
+  import('./pages/AboutPage').then((module) => ({ default: module.AboutPage })),
+);
+const ComparePage = lazy(() =>
+  import('./pages/ComparePage').then((module) => ({ default: module.ComparePage })),
+);
+const CurvesPage = lazy(() => import('./pages/CurvesPage'));
+const PipelinesPage = lazy(() =>
+  import('./pages/PipelinesPage').then((module) => ({ default: module.PipelinesPage })),
+);
+const PipelineDetailPage = lazy(() =>
+  import('./pages/PipelineDetailPage').then((module) => ({ default: module.PipelineDetailPage })),
+);
+const KnowledgePage = lazy(() =>
+  import('./pages/KnowledgePage').then((module) => ({ default: module.KnowledgePage })),
+);
+const KnowledgeDetailPage = lazy(() => import('./pages/KnowledgeDetailPage'));
+const DecisionsPage = lazy(() =>
+  import('./pages/DecisionsPage').then((module) => ({ default: module.DecisionsPage })),
+);
+const DecisionsDetailPage = lazy(() => import('./pages/DecisionsDetailPage'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
 
 function RouteFallback() {
   const { t } = useTranslation();
   return (
-    <div className="surface-card p-10 text-center text-sm text-fg-muted" role="status">
+    <div
+      className="surface-card grid min-h-[100dvh] place-items-center p-10 text-center text-sm text-fg-muted"
+      role="status"
+    >
       {t('common.loading')}
     </div>
   );
@@ -112,7 +144,32 @@ function RoadmapSketch() {
 }
 
 function Home() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
+  const focus = useFocusView();
+  const saveFocus = useSetFocus();
+  usePageMeta({ titleKey: 'seo.home.title', descriptionKey: 'seo.home.description' });
+
+  const focusTiles = focus.ready
+    ? [
+        ['home.focusTech', focus.currentTech ?? t('home.focusTechValue'), 'home.currentTech'],
+        [
+          'home.focusProject',
+          focus.currentProject?.title ?? t('home.focusProjectValue'),
+          'home.currentProject',
+        ],
+        [
+          'home.nextMilestone',
+          focus.lastVisited?.nextStepTitle ?? t('home.nextMilestoneValue'),
+          'home.upNext',
+        ],
+      ]
+    : [
+        ['home.focusTech', 'home.focusTechValue', 'home.currentTech'],
+        ['home.focusProject', 'home.focusProjectValue', 'home.currentProject'],
+        ['home.nextMilestone', 'home.nextMilestoneValue', 'home.upNext'],
+      ];
+
   return (
     <>
       <section className="hero-panel overflow-hidden rounded-[2rem] border border-border-default p-6 sm:p-10">
@@ -189,11 +246,7 @@ function Home() {
           </div>
         </div>
         <div className="relative z-10 mt-8 grid gap-3 border-t border-border-subtle pt-5 sm:grid-cols-3">
-          {[
-            ['home.focusTech', 'home.focusTechValue', 'home.currentTech'],
-            ['home.focusProject', 'home.focusProjectValue', 'home.currentProject'],
-            ['home.nextMilestone', 'home.nextMilestoneValue', 'home.upNext'],
-          ].map(([label, value, meta], i) => (
+          {focusTiles.map(([label, value, meta], i) => (
             <div key={label} className="focus-tile">
               <span
                 className={`focus-dot ${i === 0 ? 'bg-secondary' : i === 1 ? 'bg-primary' : 'bg-accent'}`}
@@ -211,34 +264,84 @@ function Home() {
         </div>
       </section>
 
+      <OwnerFocusPanel />
+
       <section className="grid gap-4 lg:grid-cols-[1.5fr_.8fr]">
-        <article className="surface-card flex flex-col justify-between gap-6 p-6 sm:flex-row sm:items-center">
-          <div className="flex items-start gap-4">
-            <div className="icon-tile bg-primary-soft text-primary">
-              <Play className="h-5 w-5 fill-current" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
-                {t('home.continue')}
-              </p>
-              <h2 className="mt-1 text-xl font-bold">{t('home.continueTitle')}</h2>
-              <p className="mt-1 text-sm text-fg-muted">{t('home.continueMeta')}</p>
-              <div className="mt-4 h-1.5 w-full max-w-56 overflow-hidden rounded-full bg-surface-active">
-                <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-primary to-accent" />
+        {focus.lastVisited ? (
+          <article className="surface-card flex flex-col justify-between gap-6 p-6 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-4">
+              <div className="icon-tile bg-primary-soft text-primary">
+                <Play className="h-5 w-5 fill-current" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
+                  {t('home.continue')}
+                </p>
+                <h2 className="mt-1 text-xl font-bold">{focus.lastVisited.title}</h2>
+                <p className="mt-1 text-sm text-fg-muted">
+                  {focus.lastVisited.nextStepTitle
+                    ? t('home.resumeStep', { step: focus.lastVisited.nextStepTitle })
+                    : t('home.resumeAllDone')}
+                </p>
+                <div className="mt-4 h-1.5 w-full max-w-56 overflow-hidden rounded-full bg-surface-active">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+                    style={{ width: `${focus.lastVisited.percent}%` }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-5">
-            <ProgressRing
-              value={68}
-              label={t('home.progress')}
-              caption={t('home.complete', { value: 68 })}
-            />
-            <Link to="/roadmaps" className="round-arrow" aria-label={t('home.resume')}>
-              <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
-            </Link>
-          </div>
-        </article>
+            <div className="flex items-center gap-5">
+              <ProgressRing
+                value={focus.lastVisited.percent}
+                label={t('home.progress')}
+                caption={t('home.complete', { value: focus.lastVisited.percent })}
+              />
+              <Link
+                to={`/roadmaps/${focus.lastVisited.roadmapId}`}
+                className="round-arrow"
+                aria-label={t('home.resume')}
+              >
+                <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
+              </Link>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => saveFocus.mutate({ lastVisited: null })}
+              >
+                {t('home.dismiss')}
+              </button>
+            </div>
+          </article>
+        ) : (
+          <article className="surface-card flex flex-col justify-between gap-6 p-6 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-4">
+              <div className="icon-tile bg-primary-soft text-primary">
+                <Play className="h-5 w-5 fill-current" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[.16em] text-primary">
+                  {t('home.continue')}
+                </p>
+                <h2 className="mt-1 text-xl font-bold">{t('home.continueTitle')}</h2>
+                <p className="mt-1 text-sm text-fg-muted">{t('home.continueMeta')}</p>
+                <div className="mt-4 h-1.5 w-full max-w-56 overflow-hidden rounded-full bg-surface-active">
+                  <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-primary to-accent" />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-5">
+              <ProgressRing
+                value={68}
+                label={t('home.progress')}
+                caption={t('home.complete', { value: 68 })}
+              />
+              <Link to="/roadmaps" className="round-arrow" aria-label={t('home.resume')}>
+                <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
+              </Link>
+            </div>
+          </article>
+        )}
         <article className="surface-card stat-card p-6">
           <div className="flex items-center justify-between">
             <span className="icon-tile bg-secondary-soft text-secondary">
@@ -341,7 +444,13 @@ function Home() {
                 <span className={`roadmap-icon tone-${tone}`}>
                   {i === 0 ? <Network /> : i === 1 ? <CircleDot /> : <Workflow />}
                 </span>
-                <span className="text-xs text-fg-muted">{t(steps)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-fg-muted">{t(steps)}</span>
+                  <ArrowUpRight
+                    className="h-4 w-4 text-fg-muted rtl:-scale-x-100"
+                    aria-hidden="true"
+                  />
+                </div>
               </div>
               <h3 className="mt-5 font-bold">{t(title)}</h3>
               <p className="mt-1 text-xs text-fg-muted">{t('home.updatedRecently')}</p>
@@ -359,13 +468,75 @@ function Home() {
                 to="/roadmaps"
                 className="stretched-link"
                 aria-label={`${t('home.open')} ${t(title)}`}
-              >
-                <ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" />
-              </Link>
+              />
             </article>
           ))}
         </div>
       </section>
+
+      <section>
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <p className="section-eyebrow">{t('home.curvesEyebrow')}</p>
+            <h2 className="mt-1 text-2xl font-bold">{t('home.curvesTitle')}</h2>
+            <p className="mt-2 text-sm text-fg-muted">{t('home.curvesSubtitle')}</p>
+          </div>
+          <Link
+            to="/curves"
+            className="inline-flex min-h-6 items-center text-sm font-semibold text-primary"
+          >
+            {t('home.curvesCta')} <ArrowRight className="ms-1 inline h-4 w-4 rtl:-scale-x-100" />
+          </Link>
+        </div>
+        <article className="surface-card p-6">
+          {seedMetrics[0] ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="tag-chip">{localize(seedMetrics[0].axis.label, lang)}</span>
+                <span className="text-xs text-fg-muted">
+                  {seedMetrics[0].points.length} {t('home.curvesPoints')}
+                </span>
+              </div>
+              <p className="text-sm leading-7 text-fg-secondary">{localize(seedMetrics[0].finding, lang)}</p>
+            </div>
+          ) : null}
+        </article>
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <p className="section-eyebrow">{t('home.compareEyebrow')}</p>
+            <h2 className="mt-1 text-2xl font-bold">{t('home.comparePreviewTitle')}</h2>
+            <p className="mt-2 text-sm text-fg-muted">{t('home.comparePreviewSubtitle')}</p>
+          </div>
+          <Link
+            to="/compare"
+            className="inline-flex min-h-6 items-center text-sm font-semibold text-primary"
+          >
+            {t('home.comparePreviewCta')} <ArrowRight className="ms-1 inline h-4 w-4 rtl:-scale-x-100" />
+          </Link>
+        </div>
+        <article className="surface-card p-6">
+          {seedComparisons[0] ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">{localize(seedComparisons[0].title, lang)}</h3>
+              <div className="flex flex-wrap gap-2">
+                {(seedComparisons[0].candidateTechIds || []).map((tid) => {
+                  const tech = seedTechProfiles.find((t) => t.id === tid);
+                  return tech ? (
+                    <span key={tid} className="tag-chip">
+                      {localize(tech.name, lang)}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+              <p className="text-sm leading-7 text-fg-secondary">{localize(seedComparisons[0].conclusion, lang)}</p>
+            </div>
+          ) : null}
+        </article>
+      </section>
+
       <section className="bottom-grid">
         <Link to="/compare" className="mini-feature">
           <span className="icon-tile bg-accent-soft text-accent">
@@ -402,23 +573,6 @@ function Home() {
   );
 }
 
-function Placeholder({ titleKey }: { titleKey: string }) {
-  const { t } = useTranslation();
-  return (
-    <div>
-      <Link to="/" className="mb-8 inline-flex min-h-6 items-center gap-2 text-sm text-fg-muted">
-        <ArrowDownLeft className="h-4 w-4 rtl:-scale-x-100" />
-        {t('home.backHome')}
-      </Link>
-      <section className="surface-card page-enter p-8">
-        <p className="section-eyebrow">{t('app.name')}</p>
-        <h1 className="mt-2 text-3xl font-bold">{t(titleKey)}</h1>
-        <p className="mt-2 text-sm text-fg-muted">{t('placeholder.comingSoon')}</p>
-      </section>
-    </div>
-  );
-}
-
 export default function App() {
   return (
     <ErrorBoundary>
@@ -449,9 +603,86 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="/compare" element={<Placeholder titleKey="pages.compare" />} />
-          <Route path="/pipelines" element={<Placeholder titleKey="pages.pipelines" />} />
-          <Route path="/about" element={<Placeholder titleKey="pages.about" />} />
+          <Route
+            path="/compare"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <ComparePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/curves"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <CurvesPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/pipelines"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <PipelinesPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/pipelines/:id"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <PipelineDetailPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/knowledge"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <KnowledgePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/knowledge/:id"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <KnowledgeDetailPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/decisions"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <DecisionsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/decisions/:id"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <DecisionsDetailPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <SearchPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/about"
+            element={
+              <Suspense fallback={<RouteFallback />}>
+                <AboutPage />
+              </Suspense>
+            }
+          />
           <Route
             path="/login"
             element={
@@ -460,7 +691,7 @@ export default function App() {
               </Suspense>
             }
           />
-          <Route path="*" element={<Placeholder titleKey="pages.notFound" />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </ErrorBoundary>

@@ -10,7 +10,10 @@
     "login": "Log in",
     "logout": "Log out",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "knowledge": "Knowledge",
+    "decisions": "Decisions",
+    "search": "Search"
   },
   "health": {
     "online": "API online",
@@ -20,10 +23,9 @@
     "comingSoon": "Phase 1 scaffold — coming soon."
   },
   "pages": {
-    "compare": "Comparison",
-    "pipelines": "Projects pipeline",
-    "about": "About",
-    "notFound": "Not found"
+    "decisions": "Decision records",
+    "knowledge": "Knowledge base",
+    "search": "Search"
   },
   "auth": {
     "title": "Welcome back",
@@ -42,12 +44,22 @@
     "subtitle": "How your roadmaps branch and run in parallel — follow a track, jump between branches, and see what's next.",
     "legend": "Node kinds",
     "minimap": "Map overview",
+    "controls": {
+      "label": "Map controls",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitView": "Fit view"
+    },
     "detail": "Roadmap details",
     "loading": "Loading map…",
     "close": "Close details",
     "open": "Open roadmap",
     "progress": "{{value}}% complete",
     "steps": "{{value}} steps",
+    "completedSteps": "Steps complete",
+    "childRoadmaps": "Child roadmaps",
+    "parentRoadmap": "Parent roadmap",
+    "topics": "Topics",
     "kind": {
       "hub": "Hub",
       "tech": "Technology",
@@ -60,7 +72,12 @@
     }
   },
   "common": {
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirm": "Yes, delete it",
+    "deleteCancel": "Keep it",
+    "skipToContent": "Skip to main content"
   },
   "roadmaps": {
     "eyebrow": "The catalog",
@@ -109,6 +126,9 @@
     "prerequisites": "Prerequisites",
     "noPrerequisites": "No prerequisites — start anywhere.",
     "stepsTitle": "Steps",
+    "route": "The route",
+    "nextStop": "Next stop",
+    "stepIndex": "Step {{current}} of {{total}}",
     "noSteps": "No steps defined yet.",
     "branch": "Branches from here",
     "stage": {
@@ -119,7 +139,113 @@
       "done": "Done"
     },
     "stepDone": "Completed",
-    "stepTodo": "Not started"
+    "stepTodo": "Not started",
+    "catalog": "Catalog"
+  },
+  "compare": {
+    "eyebrow": "Evaluate",
+    "subtitle": "Score technologies against weighted criteria — then read the friction and the decision.",
+    "count": "{{value}} criteria",
+    "pick": "Choose technologies",
+    "pickHint": "Pick at least two to see the side-by-side comparison.",
+    "criteria": "Criteria",
+    "weight": "Weight {{value}}",
+    "weightedTotal": "Weighted total",
+    "chosen": "Chosen",
+    "tableRegion": "Comparison table",
+    "qualities": "Strengths & limitations",
+    "strengths": "Strengths",
+    "limitations": "Limitations",
+    "friction": "Hidden friction",
+    "frictionIntro": "What only shows up once a project gets complex.",
+    "conclusion": "Conclusion",
+    "chosenTech": "Chosen: {{name}}",
+    "revisit": "Revisit by {{date}}",
+    "decisionLink": "Read the decision record",
+    "evidence": "Sources & evidence",
+    "newTab": "opens in a new tab",
+    "empty": {
+      "title": "Pick technologies to compare",
+      "body": "Select at least two technologies above to see the side-by-side comparison.",
+      "cta": "Add another"
+    },
+    "notFound": {
+      "title": "No comparison found",
+      "body": "This comparison is not available yet.",
+      "cta": "Back to about"
+    }
+  },
+  "about": {
+    "eyebrow": "About",
+    "title": "What RoadAtlas is",
+    "lead": "RoadAtlas is a personal-first engineering roadmap and decision hub — a place to showcase, follow, track and revisit technology roadmaps.",
+    "mission": "It answers two connected questions: what to learn or build next, and why a choice was made — keeping roadmaps, comparisons, findings and decision records in one connected view.",
+    "browse": "Browse roadmaps",
+    "exploreMap": "Explore the map",
+    "tdaim": {
+      "eyebrow": "The model",
+      "title": "Built on TDAIM",
+      "subtitle": "Theme- and Direction-Aware Incremental Model — the way this project is designed and grown, not just a label.",
+      "modular": {
+        "title": "Modular",
+        "body": "Responsibilities live in small, cohesive modules. The catalog, the map and the detail view each own their piece, so a change stays in one place."
+      },
+      "incremental": {
+        "title": "Incremental",
+        "body": "Every feature ships as a working vertical slice — roadmaps first, then the map and beyond — and each one extends the foundation instead of replacing it."
+      },
+      "themeAware": {
+        "title": "Theme-aware",
+        "body": "Dark, light and ocean themes read from one set of semantic tokens, so a new theme never means rewriting a component."
+      },
+      "directionAware": {
+        "title": "Direction-aware",
+        "body": "English (LTR) and Arabic (RTL) are first-class: layouts use logical properties and mirror without a separate stylesheet."
+      }
+    },
+    "applies": {
+      "title": "How this site applies TDAIM",
+      "subtitle": "The details behind the four pillars, visible in the interface you're using now.",
+      "tokens": {
+        "label": "Semantic tokens",
+        "body": "Components never hard-code colors; they consume CSS variables like surface, border and foreground, so themes stay consistent everywhere."
+      },
+      "themes": {
+        "label": "data-theme switching",
+        "body": "A single data-theme attribute swaps the whole palette at runtime and the choice is remembered across visits."
+      },
+      "i18n": {
+        "label": "i18next for every string",
+        "body": "All interface text is externalized into English and Arabic locale files, with interpolation handled per language."
+      },
+      "rtl": {
+        "label": "RTL by logical properties",
+        "body": "Direction-aware spacing and icons flip automatically, so the Arabic layout mirrors the English one without bespoke overrides."
+      }
+    },
+    "origin": {
+      "title": "Where it came from",
+      "body1": "RoadAtlas started as a conversation about choosing between React Native, Kotlin Multiplatform and Flutter — and the realisation that the honest story isn't the first impression but the hidden friction that appears as a project grows.",
+      "body2": "That framing — a learning curve alongside a complexity curve — became the seed for the app: capture the reasoning, the trade-offs and the findings, and keep them connected to the roadmaps and projects that produced them.",
+      "research": "Read the founding conversation",
+      "newTab": "opens in a new tab"
+    },
+    "stack": {
+      "title": "The stack",
+      "subtitle": "A small, deliberately separated set of layers — one job each.",
+      "client": {
+        "label": "Client",
+        "body": "Vite + React + TypeScript with Tailwind, React Router, TanStack Query, react-i18next and React Flow."
+      },
+      "server": {
+        "label": "Server",
+        "body": "Express + TypeScript + Mongoose with zod validation and JWT auth in an httpOnly cookie."
+      },
+      "shared": {
+        "label": "Shared",
+        "body": "TypeScript domain types used by both client and server, so the contract lives in one place."
+      }
+    }
   },
   "theme": {
     "name": "Theme",
@@ -207,7 +333,26 @@
       "cloud": "Cloud foundations",
       "cloudSteps": "15 steps"
     },
-    "days": ["M", "T", "W", "T", "F", "S", "S"]
+    "days": [
+      "M",
+      "T",
+      "W",
+      "T",
+      "F",
+      "S",
+      "S"
+    ],
+    "resumeStep": "Continue with “{{step}}”",
+    "resumeAllDone": "Every step in this roadmap is done.",
+    "dismiss": "Dismiss",
+    "curvesEyebrow": "Curves",
+    "curvesTitle": "Multi-metric insights",
+    "curvesSubtitle": "Learning, complexity, and UI friction over time.",
+    "curvesCta": "View curves",
+    "curvesPoints": "points",
+    "comparePreviewTitle": "Side-by-side choices",
+    "comparePreviewSubtitle": "Criteria, weights, notes, and evidence.",
+    "comparePreviewCta": "View comparisons"
   },
   "error": {
     "title": "Something went wrong",
@@ -218,5 +363,326 @@
     "copyright": "© {{year}} RoadAtlas",
     "tagline": "A map for what you’re becoming.",
     "note": "Progress is saved as you go."
+  },
+  "curves": {
+    "title": "Curves",
+    "subtitle": "Multiple metrics per technology — not just the learning curve.",
+    "metricSwitcher": "Metric switcher",
+    "noMetrics": "No metrics to display",
+    "cta": "Return to default",
+    "findings": "Findings",
+    "chartAria": "Technology metrics curves",
+    "series": "Series",
+    "value": "Value",
+    "effort": "Effort",
+    "evidence": "Evidence"
+  },
+  "pipelines": {
+    "eyebrow": "Pipelines",
+    "title": "Projects pipeline",
+    "subtitle": "Follow each project through its stages, from idea to done.",
+    "count": "{{value}} pipelines",
+    "newPipeline": "New pipeline",
+    "newUnavailable": "Creating pipelines isn't available in this preview.",
+    "adminOnly": "Admin only",
+    "listTitle": "All pipelines",
+    "timeline": "Stage timeline",
+    "currentStage": "Current stage",
+    "stageDone": "Done",
+    "stageCurrent": "Current",
+    "stageUpcoming": "Upcoming",
+    "stepsTitle": "Steps",
+    "noSteps": "No steps yet.",
+    "updated": "Last updated {{date}}",
+    "open": "Open",
+    "backToList": "Back to pipelines",
+    "notFound": {
+      "title": "Pipeline not found",
+      "body": "This pipeline doesn't exist or isn't part of the catalog.",
+      "cta": "View all pipelines"
+    }
+  },
+  "notFound": {
+    "title": "This page took a wrong turn",
+    "body": "We couldn't find the page you were looking for. It may have moved, or the link that brought you here may be broken.",
+    "home": "Back to home",
+    "roadmaps": "Browse roadmaps",
+    "popular": "Popular destinations"
+  },
+  "workspace": {
+    "title": "Your roadmaps",
+    "subtitle": "Roadmaps you own are stored on the server. They stay private until you publish them.",
+    "new": "New roadmap",
+    "open": "Open",
+    "empty": "You have not created a roadmap yet.",
+    "loading": "Loading your roadmaps…",
+    "error": "Could not load your roadmaps. Sign in and make sure the API has a database configured.",
+    "createError": "The roadmap could not be created. Check the details and try again.",
+    "updated": "Updated {{date}}",
+    "delete": "Delete",
+    "deleteConfirm": "Yes, delete it",
+    "deleteCancel": "Keep it",
+    "kind": {
+      "hub": "Hub",
+      "tech": "Technology",
+      "pipeline": "Pipeline"
+    },
+    "visibility": {
+      "public": "Public",
+      "private": "Private"
+    },
+    "form": {
+      "titleEn": "Title (English)",
+      "titleAr": "Title (Arabic)",
+      "description": "Description",
+      "kind": "Kind",
+      "visibility": "Visibility",
+      "create": "Create roadmap",
+      "creating": "Creating…",
+      "cancel": "Cancel"
+    },
+    "detail": {
+      "steps": "Steps",
+      "noSteps": "No steps yet.",
+      "stepTitle": "Step title",
+      "stepStage": "Stage",
+      "noStage": "No stage",
+      "add": "Add step",
+      "adding": "Adding…",
+      "markDone": "Mark as done",
+      "markTodo": "Mark as not done",
+      "publish": "Publish",
+      "unpublish": "Make private"
+    }
+  },
+  "focusPanel": {
+    "title": "Your focus",
+    "subtitle": "What you are working on right now — stored on the server for your account.",
+    "currentTech": "Current technology",
+    "currentProject": "Current project",
+    "none": "Not set",
+    "save": "Save focus",
+    "error": "The focus could not be saved. Try again."
+  },
+  "knowledge": {
+    "eyebrow": "Connected knowledge",
+    "title": "Knowledge base",
+    "subtitle": "Notes attached to roadmaps, steps, technologies, and decisions.",
+    "filters": "Filters",
+    "filterTarget": "Target",
+    "all": "All",
+    "target": {
+      "roadmap": "Roadmap",
+      "step": "Step",
+      "tech": "Technology",
+      "decision": "Decision"
+    },
+    "tags": "Tags",
+    "searchPlaceholder": "Filter by title or tag…",
+    "count": "{{value}} notes",
+    "empty": {
+      "title": "No notes yet",
+      "body": "Notes help capture context and references as you build your map.",
+      "cta": "Browse roadmaps"
+    },
+    "emptyFiltered": {
+      "title": "Nothing matches",
+      "body": "Try different filters or clear them.",
+      "cta": "Clear filters"
+    },
+    "view": "Open note",
+    "by": "By {{owner}}",
+    "references": "References",
+    "crossLinks": "Cross-links",
+    "owner": {
+      "title": "Your notes",
+      "subtitle": "Create notes attached to a target with markdown content.",
+      "new": "New note",
+      "form": {
+        "targetType": "Target type",
+        "targetId": "Target ID",
+        "targetIdHint": "Roadmap/step/tech/decision id or slug",
+        "titleEn": "Title (English)",
+        "titleAr": "Title (Arabic)",
+        "contentEn": "Content (English, Markdown)",
+        "contentAr": "Content (Arabic, Markdown)",
+        "tags": "Tags (comma separated)",
+        "references": "References (comma separated URLs/slugs)",
+        "visibility": "Visibility",
+        "create": "Create note",
+        "creating": "Creating…",
+        "cancel": "Cancel"
+      },
+      "visibility": {
+        "public": "Public",
+        "private": "Private"
+      },
+      "empty": "You have not created a note yet.",
+      "error": "Could not load your notes.",
+      "update": "Save note",
+      "updating": "Saving…",
+      "createError": "The note could not be created. Check the details and try again.",
+      "updateError": "The note could not be saved. Check the details and try again.",
+      "deleteError": "The note could not be deleted. Try again."
+    },
+    "detail": {
+      "backToKnowledge": "Back to knowledge",
+      "tags": "Tags",
+      "references": "References",
+      "target": "Attached to"
+    },
+    "searchLabel": "Filter notes",
+    "yours": "Yours",
+    "updated": "Updated {{date}}"
+  },
+  "decisions": {
+    "eyebrow": "Records",
+    "title": "Decision records",
+    "subtitle": "ADR-style records capturing context, alternatives, decision, and consequences.",
+    "count": "{{value}} records",
+    "empty": {
+      "title": "No decision records yet",
+      "body": "Record decisions with context and revisit dates to keep them accountable.",
+      "cta": "Browse knowledge"
+    },
+    "view": "Open record",
+    "revisit": "Revisit {{date}}",
+    "context": "Context",
+    "alternatives": "Alternatives",
+    "decision": "Decision",
+    "consequences": "Consequences",
+    "links": "Links",
+    "owner": {
+      "title": "Your decision records",
+      "subtitle": "Create ADR-style records you can revisit later.",
+      "new": "New record",
+      "form": {
+        "contextEn": "Context (English)",
+        "contextAr": "Context (Arabic)",
+        "alternativesEn": "Alternatives (English, one per line)",
+        "alternativesAr": "Alternatives (Arabic, one per line)",
+        "decisionEn": "Decision (English)",
+        "decisionAr": "Decision (Arabic)",
+        "consequencesEn": "Consequences (English)",
+        "consequencesAr": "Consequences (Arabic)",
+        "revisitAt": "Revisit at (ISO date)",
+        "links": "Links (label|url, one per line)",
+        "visibility": "Visibility",
+        "create": "Create record",
+        "creating": "Creating…",
+        "cancel": "Cancel"
+      },
+      "visibility": {
+        "public": "Public",
+        "private": "Private"
+      },
+      "empty": "You have not created a decision record yet.",
+      "error": "Could not load your decision records.",
+      "update": "Save record",
+      "updating": "Saving…",
+      "createError": "The record could not be created. Check the details and try again.",
+      "updateError": "The record could not be saved. Check the details and try again.",
+      "deleteError": "The record could not be deleted. Try again."
+    },
+    "detail": {
+      "backToDecisions": "Back to decision records"
+    },
+    "updated": "Updated {{date}}"
+  },
+  "search": {
+    "eyebrow": "Discover",
+    "title": "Search",
+    "subtitle": "Search across roadmaps, steps, technologies, comparisons, curves, notes, and decisions.",
+    "placeholder": "Search for anything…",
+    "filters": "Filters",
+    "filterType": "Entity type",
+    "all": "All",
+    "type": {
+      "roadmap": "Roadmap",
+      "step": "Step",
+      "tech": "Technology",
+      "comparison": "Comparison",
+      "curve": "Curve/Metric",
+      "note": "Note",
+      "decision": "Decision"
+    },
+    "results": "{{value}} results",
+    "emptyQuery": {
+      "title": "Start searching",
+      "body": "Type a query to search across the catalog and knowledge base."
+    },
+    "empty": {
+      "title": "No results",
+      "body": "Try a different query or clear filters."
+    },
+    "go": "Open",
+    "in": "in {{context}}"
+  },
+  "seo": {
+    "siteName": "RoadAtlas",
+    "home": {
+      "title": "RoadAtlas",
+      "description": "Showcase, follow, track, and revisit technology roadmaps."
+    },
+    "roadmaps": {
+      "title": "Roadmaps",
+      "description": "Browse and track learning paths with progress and branches."
+    },
+    "roadmapDetail": {
+      "title": "Roadmap",
+      "description": "View steps, progress, and details for a roadmap."
+    },
+    "map": {
+      "title": "Hub map",
+      "description": "Explore relationships between hubs and their roadmaps."
+    },
+    "compare": {
+      "title": "Compare",
+      "description": "Side-by-side technology comparisons with criteria and evidence."
+    },
+    "curves": {
+      "title": "Curves",
+      "description": "Multi-metric curves with written findings over time."
+    },
+    "pipelines": {
+      "title": "Pipelines",
+      "description": "Track projects through idea, design, build, ship, and done."
+    },
+    "pipelineDetail": {
+      "title": "Pipeline",
+      "description": "View pipeline stages and progress."
+    },
+    "knowledge": {
+      "title": "Knowledge base",
+      "description": "Notes, tags, references, and cross-links across the atlas."
+    },
+    "knowledgeDetail": {
+      "title": "Note",
+      "description": "Read a knowledge note with context and references."
+    },
+    "decisions": {
+      "title": "Decision records",
+      "description": "ADR-style records of context, alternatives, decisions, and consequences."
+    },
+    "decisionsDetail": {
+      "title": "Decision record",
+      "description": "Read a decision record with rationale and links."
+    },
+    "search": {
+      "title": "Search",
+      "description": "Search across roadmaps, steps, technologies, comparisons, curves, notes, and decisions."
+    },
+    "about": {
+      "title": "About",
+      "description": "About RoadAtlas and the TDAIM development model."
+    },
+    "login": {
+      "title": "Log in",
+      "description": "Sign in to manage your roadmaps and content."
+    },
+    "notFound": {
+      "title": "Page not found",
+      "description": "The page you requested could not be found."
+    }
   }
 }

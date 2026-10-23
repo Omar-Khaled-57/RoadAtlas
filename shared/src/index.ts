@@ -4,6 +4,8 @@ export interface HealthResponse {
   status: string;
   service: string;
   time: string;
+  uptimeSeconds?: number;
+  database?: 'connected' | 'disconnected' | 'disabled';
 }
 
 export type Visibility = 'public' | 'private';
@@ -159,6 +161,8 @@ export interface Progress extends Timestamps {
 export interface ApiError {
   message: string;
   details?: unknown;
+  /** Correlates a client-visible failure with server logs. */
+  requestId?: string;
 }
 
 export interface AuthUser {

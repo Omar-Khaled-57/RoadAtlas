@@ -18,6 +18,11 @@ small file and can evolve without rewriting the rest.
   principles, privacy and hosting assumptions, module map, incremental delivery sequence, and
   quality bar distilled from the founding conversation.
 
+## Operations
+
+- [Operations](./operations.md) — environment variables, logging and request ids, health, backup and
+  restore, deploy checklist, CI.
+
 ## Page specs
 
 Per-page specifications (each split into section specs), with priorities. Start at the

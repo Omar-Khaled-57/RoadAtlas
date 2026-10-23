@@ -1,7 +1,10 @@
 import { Map as MapIcon, type LucideIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePageMeta } from '../lib/seo';
+
 import { Link } from 'react-router-dom';
+import { OwnerRoadmaps } from '../components/OwnerRoadmaps';
 import { RoadmapCard } from '../components/RoadmapCard';
 import { roadmapStatus, seedRoadmaps, type RoadmapStatus } from '../data/roadmaps';
 import { KIND_ICON } from '../lib/roadmapMeta';
@@ -14,6 +17,7 @@ const KIND_FILTERS: KindFilter[] = ['all', 'hub', 'tech', 'pipeline'];
 const STATUS_FILTERS: StatusFilter[] = ['all', 'planned', 'in-progress', 'completed', 'paused'];
 
 export function RoadmapsPage() {
+  usePageMeta({ titleKey: 'seo.roadmaps.title', descriptionKey: 'seo.roadmaps.description' });
   const { t } = useTranslation();
   const [kind, setKind] = useState<KindFilter>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -63,6 +67,8 @@ export function RoadmapsPage() {
         />
       </section>
 
+      <h2 className="sr-only">{t('roadmaps.catalog')}</h2>
+
       {roadmaps.length > 0 ? (
         <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
           {roadmaps.map((roadmap) => (
@@ -101,6 +107,8 @@ export function RoadmapsPage() {
           )}
         </section>
       )}
+
+      <OwnerRoadmaps />
     </div>
   );
 }
