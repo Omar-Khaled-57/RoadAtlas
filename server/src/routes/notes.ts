@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { NoteModel } from '../models/index';
+import { db } from '../models/index';
 import { notFound } from '../lib/api-error';
 import { parseOrThrow } from '../lib/parse';
 import { redactPublic, toNoteDto } from '../lib/dto';
@@ -21,11 +21,12 @@ notesRouter.get('/', optionalAuth, async (req, res) => {
   if (targetType) filter.targetType = targetType;
   if (targetId) filter.targetId = targetId;
 
-  const docs = await NoteModel.find(filter).sort({ createdAt: 1 }).lean();
+  const docs = await db.note.findMany({
+    where: filter,
+    orderBy: { createdAt: 'asc' },
+  });
   const items = docs.map((doc) => {
     const dto = toNoteDto(doc) as unknown as Record<string, unknown>;
-    // Only anonymous readers lose `ownerId`; signed-in callers need it to detect
-    // their own public records (ownership checks and edit affordances).
     if (!caller) {
       const rest = redactPublic(dto);
       return rest;
@@ -37,7 +38,9 @@ notesRouter.get('/', optionalAuth, async (req, res) => {
 
 notesRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await NoteModel.findById(id).lean();
+  const doc = await db.note.findUnique({
+    where: { id },
+  });
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Note not found.');
   const dto = toNoteDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -52,8 +55,10 @@ notesRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createNoteSchema, req.body);
   const ownerId = callerId(res);
 
-  const note = await NoteModel.create({ ...input, ownerId });
-  res.status(201).json(toNoteDto(note.toObject()));
+  const note = await db.note.create({
+    data: { ...input, ownerId },
+  });
+  res.status(201).json(toNoteDto(note));
 });
 
 notesRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -61,16 +66,20 @@ notesRouter.patch('/:id', requireAuth, async (req, res) => {
   const input = parseOrThrow(updateNoteSchema, req.body);
   const ownerId = callerId(res);
 
+  const existing = await db.note.findUnique({
+    where: { id },
+    select: { ownerId: true },
+  });
+  if (!existing || existing.ownerId !== ownerId) throw notFound('Note not found.');
+
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await NoteModel.findOneAndUpdate(
-    { _id: id, ownerId },
-    { $set: changes },
-    { returnDocument: 'after', runValidators: true },
-  ).lean();
+  const updated = await db.note.update({
+    where: { id },
+    data: changes,
+  });
 
-  if (!updated) throw notFound('Note not found.');
   res.json(toNoteDto(updated));
 });
 
@@ -78,7 +87,13 @@ notesRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const deleted = await NoteModel.findOneAndDelete({ _id: id, ownerId });
-  if (!deleted) throw notFound('Note not found.');
+  const existing = await db.note.findUnique({
+    where: { id },
+  });
+  if (!existing || existing.ownerId !== ownerId) throw notFound('Note not found.');
+
+  await db.note.delete({
+    where: { id },
+  });
   res.status(204).end();
 });

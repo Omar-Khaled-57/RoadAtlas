@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ProgressModel, RoadmapModel, StepModel } from '../models/index';
+import { db } from '../models/index';
 import { notFound } from '../lib/api-error';
 import { parseOrThrow } from '../lib/parse';
 import { redactPublic, toProgressDto, toRoadmapDto, toStepDto } from '../lib/dto';
@@ -40,7 +40,7 @@ function parentKindMessage(parentKind: string, childKind: string): string {
 /** Remove `undefined` entries so a partial update never clears a field by accident. */
 function definedEntries(input: Record<string, unknown>): Record<string, unknown> {
   const entries = Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined),
+    Object.entries(input).filter(([, value]) => value !== undefined && value !== null),
   );
   if ('revision' in entries && typeof entries.revision === 'number') {
     entries.revision = (entries.revision ?? 0) + 1;
@@ -56,9 +56,11 @@ async function createsParentCycle(childId: string, parentId: string): Promise<bo
   while (cursor && !seen.has(cursor) && seen.size < 100) {
     if (cursor === childId) return true;
     seen.add(cursor);
-    const node: { parentId?: unknown } | null = await RoadmapModel.findById(cursor)
-      .select('parentId')
-      .lean();
+    let node: { parentId: string | null } | null = null;
+    node = await db.roadmap.findUnique({
+      where: { id: cursor },
+      select: { parentId: true },
+    });
     cursor = node?.parentId ? String(node.parentId) : undefined;
   }
   return false;
@@ -67,7 +69,10 @@ async function createsParentCycle(childId: string, parentId: string): Promise<bo
 roadmapsRouter.get('/', optionalAuth, async (req, res) => {
   const { scope = 'public' } = parseOrThrow(listQuerySchema, req.query);
   const filter = scopeFilter(scope, optionalCallerId(res));
-  const docs = await RoadmapModel.find(filter).sort({ order: 1, createdAt: 1 }).lean();
+  const docs = await db.roadmap.findMany({
+    where: filter,
+    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+  });
   const items = docs.map((doc) => {
     const dto = toRoadmapDto(doc) as unknown as Record<string, unknown>;
     // Only anonymous readers lose `ownerId`; signed-in callers need it to detect
@@ -83,7 +88,9 @@ roadmapsRouter.get('/', optionalAuth, async (req, res) => {
 
 roadmapsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await RoadmapModel.findById(id).lean();
+  const doc = await db.roadmap.findUnique({
+    where: { id },
+  });
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Roadmap not found.');
   const dto = toRoadmapDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -100,10 +107,11 @@ roadmapsRouter.post('/', requireAuth, async (req, res) => {
   const { steps, ...roadmapInput } = input;
 
   if (roadmapInput.parentId) {
-    const parent = await RoadmapModel.findOne({ _id: roadmapInput.parentId, ownerId })
-      .select('kind')
-      .lean();
-    if (!parent) {
+    const parent = await db.roadmap.findUnique({
+      where: { id: roadmapInput.parentId },
+      select: { kind: true, ownerId: true },
+    });
+    if (!parent || parent.ownerId !== ownerId) {
       res.status(400).json({ message: 'Parent roadmap not found.' });
       return;
     }
@@ -113,20 +121,35 @@ roadmapsRouter.post('/', requireAuth, async (req, res) => {
     }
   }
 
-  const roadmap = await RoadmapModel.create({ ...roadmapInput, ownerId });
-  if (steps?.length) {
-    await StepModel.insertMany(
-      steps.map((step, index) => ({
-        ...step,
-        ownerId,
-        roadmapId: roadmap._id,
-        order: step.order ?? index,
-      })),
-    );
-  }
+  const { description, techId, ...roadmapRest } = roadmapInput;
+  const roadmap = await db.roadmap.create({
+    data: {
+      ...roadmapRest,
+      ownerId,
+      description: description ?? undefined,
+      techId: techId ?? undefined,
+      ...(steps?.length
+        ? {
+            steps: {
+              create: steps.map((step, index) => ({
+                title: step.title,
+                description: step.description ?? undefined,
+                resources: step.resources ?? [],
+                order: step.order ?? index,
+                stage: step.stage ?? undefined,
+                note: step.note ?? undefined,
+                done: step.done ?? undefined,
+                ownerId,
+                linkedRoadmapId: step.linkedRoadmapId ?? undefined,
+                linkedStepId: step.linkedStepId ?? undefined,
+              })),
+            },
+          }
+        : {}),
+    },
+  });
 
-  const created = await RoadmapModel.findById(roadmap._id).lean();
-  res.status(201).json(toRoadmapDto(created));
+  res.status(201).json(toRoadmapDto(roadmap));
 });
 
 roadmapsRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -139,12 +162,16 @@ roadmapsRouter.patch('/:id', requireAuth, async (req, res) => {
       res.status(400).json({ message: 'A roadmap cannot be its own parent.' });
       return;
     }
-    const current = await RoadmapModel.findOne({ _id: id, ownerId }).select('kind').lean();
-    if (!current) throw notFound('Roadmap not found.');
-    const parent = await RoadmapModel.findOne({ _id: input.parentId, ownerId })
-      .select('kind parentId')
-      .lean();
-    if (!parent) {
+    const current = await db.roadmap.findUnique({
+      where: { id },
+      select: { kind: true, ownerId: true },
+    });
+    if (!current || current.ownerId !== ownerId) throw notFound('Roadmap not found.');
+    const parent = await db.roadmap.findUnique({
+      where: { id: input.parentId },
+      select: { kind: true, parentId: true, ownerId: true },
+    });
+    if (!parent || parent.ownerId !== ownerId) {
       res.status(400).json({ message: 'Parent roadmap not found.' });
       return;
     }
@@ -163,41 +190,53 @@ roadmapsRouter.patch('/:id', requireAuth, async (req, res) => {
   // otherwise parentage becomes cross-kind through the back door.
   if (input.kind) {
     const nextKind = input.kind;
-    const current = await RoadmapModel.findOne({ _id: id, ownerId }).select('parentId').lean();
-    if (!current) throw notFound('Roadmap not found.');
+    const current = await db.roadmap.findUnique({
+      where: { id },
+      select: { parentId: true, ownerId: true },
+    });
+    if (!current || current.ownerId !== ownerId) throw notFound('Roadmap not found.');
 
     if (!('parentId' in input) && current.parentId) {
-      const parent = await RoadmapModel.findById(current.parentId).select('kind').lean();
+      const parent = await db.roadmap.findUnique({
+        where: { id: current.parentId },
+        select: { kind: true },
+      });
       if (parent && !canContain(parent.kind, nextKind)) {
         res.status(400).json({ message: parentKindMessage(parent.kind, nextKind) });
         return;
       }
     }
 
-    const childKinds = (await RoadmapModel.distinct('kind', { parentId: id })) as string[];
-    const mismatchedChildKind = childKinds.find((kind) => !canContain(nextKind, kind));
+    const children = await db.roadmap.findMany({
+      where: { parentId: id },
+      select: { kind: true },
+    });
+    const mismatchedChildKind = children.find((kind) => !canContain(nextKind, kind.kind));
     if (mismatchedChildKind) {
-      res.status(400).json({ message: parentKindMessage(nextKind, mismatchedChildKind) });
+      res.status(400).json({ message: parentKindMessage(nextKind, mismatchedChildKind.kind) });
       return;
     }
   }
 
   const update = { ...input };
   if ('revision' in update && typeof update.revision === 'number') {
-    const existing = await RoadmapModel.findOne({ _id: id, ownerId }).select('revision').lean();
-    if (existing && existing.revision !== update.revision) {
+    const existing = await db.roadmap.findUnique({
+      where: { id },
+      select: { revision: true, ownerId: true },
+    });
+    if (!existing || existing.ownerId !== ownerId) throw notFound('Roadmap not found.');
+    if (existing.revision !== update.revision) {
       res.status(409).json({ message: 'Conflict: roadmap was updated elsewhere.' });
       return;
     }
   }
 
-  const updated = await RoadmapModel.findOneAndUpdate(
-    { _id: id, ownerId },
-    { $set: definedEntries(update) },
-    { returnDocument: 'after', runValidators: true },
-  ).lean();
+  const updated = await db.roadmap.update({
+    where: { id },
+    data: definedEntries(update),
+  });
 
-  if (!updated) throw notFound('Roadmap not found.');
+  if (!updated || updated.ownerId !== ownerId) throw notFound('Roadmap not found.');
   res.json(toRoadmapDto(updated));
 });
 
@@ -205,29 +244,38 @@ roadmapsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const children = await RoadmapModel.countDocuments({ parentId: id, ownerId });
+  const children = await db.roadmap.count({
+    where: { parentId: id, ownerId },
+  });
   if (children > 0) {
     res.status(400).json({ message: 'Reparent or remove child roadmaps before deleting.' });
     return;
   }
 
-  const deleted = await RoadmapModel.findOneAndDelete({ _id: id, ownerId });
-  if (!deleted) throw notFound('Roadmap not found.');
+  const existing = await db.roadmap.findUnique({
+    where: { id },
+  });
+  if (!existing || existing.ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-  const steps = await StepModel.find({ roadmapId: id, ownerId }).select('_id').lean();
-  await StepModel.deleteMany({ roadmapId: id, ownerId });
-  await ProgressModel.deleteMany({ ownerId, stepId: { $in: steps.map((step) => step._id) } });
+  await db.roadmap.delete({
+    where: { id },
+  });
 
   res.status(204).end();
 });
 
 roadmapsRouter.get('/:id/steps', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const roadmap = await RoadmapModel.findById(id).lean();
+  const roadmap = await db.roadmap.findUnique({
+    where: { id },
+  });
   if (!roadmap || !isReadable(roadmap, optionalCallerId(res))) throw notFound('Roadmap not found.');
   const caller = optionalCallerId(res);
 
-  const steps = await StepModel.find({ roadmapId: id }).sort({ order: 1 }).lean();
+  const steps = await db.step.findMany({
+    where: { roadmapId: id },
+    orderBy: { order: 'asc' },
+  });
   const items = steps.map((step) => {
     const dto = toStepDto(step) as unknown as Record<string, unknown>;
     if (roadmap.visibility === 'public' && !caller) {
@@ -244,32 +292,45 @@ roadmapsRouter.post('/:id/steps', requireAuth, async (req, res) => {
   const input = parseOrThrow(createStepSchema, req.body);
   const ownerId = callerId(res);
 
-  const roadmap = await RoadmapModel.findOne({ _id: id, ownerId });
-  if (!roadmap) throw notFound('Roadmap not found.');
+  const roadmap = await db.roadmap.findUnique({
+    where: { id },
+  });
+  if (!roadmap || roadmap.ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-  const count = await StepModel.countDocuments({ roadmapId: id });
-  const step = await StepModel.create({
-    ...input,
-    ownerId,
-    roadmapId: id,
-    order: input.order ?? count,
+  const count = await db.step.count({
+    where: { roadmapId: id },
+  });
+  const step = await db.step.create({
+    data: {
+      ...input,
+      ownerId,
+      roadmapId: id,
+      order: input.order ?? count,
+    },
   });
 
-  res.status(201).json(toStepDto(step.toObject()));
+  res.status(201).json(toStepDto(step));
 });
 
 roadmapsRouter.get('/:id/progress', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const roadmap = await RoadmapModel.findOne({ _id: id, ownerId });
-  if (!roadmap) throw notFound('Roadmap not found.');
+  const roadmap = await db.roadmap.findUnique({
+    where: { id },
+  });
+  if (!roadmap || roadmap.ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-  const steps = await StepModel.find({ roadmapId: id, ownerId }).select('_id').lean();
-  const items = await ProgressModel.find({
-    ownerId,
-    stepId: { $in: steps.map((step) => step._id) },
-  }).lean();
+  const steps = await db.step.findMany({
+    where: { roadmapId: id },
+    select: { id: true },
+  });
+  const items = await db.progress.findMany({
+    where: {
+      ownerId,
+      stepId: { in: steps.map((step) => step.id) },
+    },
+  });
 
   res.json({ items: items.map(toProgressDto) });
 });

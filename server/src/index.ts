@@ -1,6 +1,6 @@
 import { createApp } from './app';
 import { env } from './config/env';
-import { connectDb, disconnectDb } from './db/connect';
+import { connectDb, disconnectDb } from './lib/db';
 import { logger } from './lib/logger';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;

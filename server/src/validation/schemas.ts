@@ -30,7 +30,7 @@ export const roadmapKindSchema = z.enum(['hub', 'tech', 'pipeline']);
 export const pipelineStageSchema = z.enum(['idea', 'design', 'build', 'ship', 'done']);
 export const noteTargetTypeSchema = z.enum(['roadmap', 'step', 'tech', 'decision']);
 
-export const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid identifier.');
+export const objectIdSchema = z.string().uuid('Invalid identifier.');
 
 export const listQuerySchema = z.object({
   scope: z.enum(['public', 'owner']).optional(),

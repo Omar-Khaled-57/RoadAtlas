@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { createApp } from './app';
-import { connectDb } from './db/connect';
+import { connectDb } from './lib/db';
 
 /** Vercel augments the Node request with parsed query values. */
 type VercelRequest = Request & {

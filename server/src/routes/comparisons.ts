@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ComparisonModel } from '../models/index';
+import { db } from '../models/index';
 import { notFound } from '../lib/api-error';
 import { parseOrThrow } from '../lib/parse';
 import { redactPublic, toComparisonDto } from '../lib/dto';
@@ -19,11 +19,12 @@ comparisonsRouter.get('/', optionalAuth, async (req, res) => {
   const filter = scopeFilter(scope, optionalCallerId(res));
   const caller = optionalCallerId(res);
 
-  const docs = await ComparisonModel.find(filter).sort({ createdAt: 1 }).lean();
+  const docs = await db.comparison.findMany({
+    where: filter,
+    orderBy: { createdAt: 'asc' },
+  });
   const items = docs.map((doc) => {
     const dto = toComparisonDto(doc) as unknown as Record<string, unknown>;
-    // Only anonymous readers lose `ownerId`; signed-in callers need it to detect
-    // their own public records (ownership checks and edit affordances).
     if (!caller) {
       const rest = redactPublic(dto);
       return rest;
@@ -35,7 +36,9 @@ comparisonsRouter.get('/', optionalAuth, async (req, res) => {
 
 comparisonsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await ComparisonModel.findById(id).lean();
+  const doc = await db.comparison.findUnique({
+    where: { id },
+  });
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Comparison not found.');
   const dto = toComparisonDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -50,8 +53,10 @@ comparisonsRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createComparisonSchema, req.body);
   const ownerId = callerId(res);
 
-  const comparison = await ComparisonModel.create({ ...input, ownerId });
-  res.status(201).json(toComparisonDto(comparison.toObject()));
+  const comparison = await db.comparison.create({
+    data: { ...input, ownerId },
+  });
+  res.status(201).json(toComparisonDto(comparison));
 });
 
 comparisonsRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -62,13 +67,12 @@ comparisonsRouter.patch('/:id', requireAuth, async (req, res) => {
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await ComparisonModel.findOneAndUpdate(
-    { _id: id, ownerId },
-    { $set: changes },
-    { returnDocument: 'after', runValidators: true },
-  ).lean();
+  const updated = await db.comparison.update({
+    where: { id },
+    data: changes,
+  });
 
-  if (!updated) throw notFound('Comparison not found.');
+  if (!updated || updated.ownerId !== ownerId) throw notFound('Comparison not found.');
   res.json(toComparisonDto(updated));
 });
 
@@ -76,7 +80,13 @@ comparisonsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const deleted = await ComparisonModel.findOneAndDelete({ _id: id, ownerId });
-  if (!deleted) throw notFound('Comparison not found.');
+  const existing = await db.comparison.findUnique({
+    where: { id },
+  });
+  if (!existing || existing.ownerId !== ownerId) throw notFound('Comparison not found.');
+
+  await db.comparison.delete({
+    where: { id },
+  });
   res.status(204).end();
 });

@@ -81,7 +81,7 @@ export function toRoadmapDto(input: unknown): Roadmap {
   const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined;
   const image = typeof raw.image === 'string' && raw.image ? raw.image : undefined;
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     visibility: raw.visibility as Visibility,
     kind: raw.kind as RoadmapKind,
@@ -105,7 +105,7 @@ export function toRoadmapDto(input: unknown): Roadmap {
 export function toStepDto(input: unknown): Step {
   const raw = (input ?? {}) as Raw;
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     roadmapId: toId(raw.roadmapId) ?? '',
     title: toLocalized(raw.title) ?? { en: '' },
@@ -134,7 +134,7 @@ export interface ProgressDto {
 export function toProgressDto(input: unknown): ProgressDto {
   const raw = (input ?? {}) as Raw;
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     stepId: toId(raw.stepId) ?? '',
     done: Boolean(raw.done),
@@ -162,7 +162,7 @@ export function toComparisonDto(input: unknown): Comparison {
   const revisitAt = raw.revisitAt ? toIso(raw.revisitAt) : undefined;
 
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     visibility: raw.visibility as Visibility,
     title: toLocalized(raw.title) ?? { en: '' },
@@ -193,7 +193,7 @@ export function toMetricDto(input: unknown): Metric {
   const unit = typeof axisRaw.unit === 'string' && axisRaw.unit ? axisRaw.unit : undefined;
 
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     visibility: raw.visibility as Visibility,
     techId: typeof raw.techId === 'string' ? raw.techId : '',
@@ -215,7 +215,7 @@ export function toMetricDto(input: unknown): Metric {
 export function toNoteDto(input: unknown): Note {
   const raw = (input ?? {}) as Raw;
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     visibility: raw.visibility as Visibility,
     targetType: raw.targetType as Note['targetType'],
@@ -234,7 +234,7 @@ export function toDecisionDto(input: unknown): DecisionRecord {
   const raw = (input ?? {}) as Raw;
   const revisitAt = raw.revisitAt ? toIso(raw.revisitAt) : undefined;
   return {
-    id: toId(raw._id) ?? '',
+    id: toId(raw.id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
     visibility: raw.visibility as Visibility,
     context: toLocalized(raw.context) ?? { en: '' },

@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import { badRequest, unavailable } from '../lib/api-error';
-import { FocusModel, RoadmapModel, StepModel } from '../models/index';
+import { db } from '../models/index';
 import { parseOrThrow } from '../lib/parse';
 import { toFocusDto } from '../lib/dto';
 import { callerId } from '../lib/scope';
@@ -13,12 +12,14 @@ export const focusRouter = Router();
 
 /** Focus is a per-owner singleton (ADR 0004): the hero and "continue where you left off". */
 focusRouter.get('/', requireAuth, async (_req, res, next) => {
-  if (!hasDb || mongoose.connection.readyState !== 1) {
+  if (!hasDb) {
     next(unavailable('Persistence is not configured on this server.'));
     return;
   }
   const ownerId = callerId(res);
-  const focus = await FocusModel.findOne({ ownerId }).lean();
+  const focus = await db.focus.findFirst({
+    where: { ownerId },
+  });
 
   res.json(
     focus
@@ -33,7 +34,7 @@ focusRouter.get('/', requireAuth, async (_req, res, next) => {
 });
 
 focusRouter.put('/', requireAuth, async (req, res, next) => {
-  if (!hasDb || mongoose.connection.readyState !== 1) {
+  if (!hasDb) {
     next(unavailable('Persistence is not configured on this server.'));
     return;
   }
@@ -53,27 +54,29 @@ focusRouter.put('/', requireAuth, async (req, res, next) => {
     await Promise.all(
       input.items.map(async (item) => {
         if (item.kind === 'milestone') {
-          const step = await StepModel.findOne({ _id: item.targetId, ownerId })
-            .select('roadmapId')
-            .lean();
-          if (!step) throw badRequest('Focus milestone must reference an owned step.');
-          const parent = await RoadmapModel.findOne({ _id: step.roadmapId, ownerId })
-            .select('kind')
-            .lean();
-          if (!parent || parent.kind !== 'pipeline') {
+          const step = await db.step.findUnique({
+            where: { id: item.targetId },
+          });
+          if (!step || step.ownerId !== ownerId) throw badRequest('Focus milestone must reference an owned step.');
+          const parent = await db.roadmap.findUnique({
+            where: { id: step.roadmapId },
+          });
+          if (!parent || parent.ownerId !== ownerId || parent.kind !== 'pipeline') {
             throw badRequest('Focus milestone must belong to an owned pipeline.');
           }
           return;
         }
         const expectedKind = item.kind === 'technology' ? 'tech' : 'pipeline';
-        const roadmap = await RoadmapModel.findOne({
-          _id: item.targetId,
-          ownerId,
-          kind: expectedKind,
-        })
-          .select('_id')
-          .lean();
-        if (!roadmap) throw badRequest('Focus row must reference a matching owned roadmap.');
+        const roadmap = await db.roadmap.findUnique({
+          where: { id: item.targetId },
+        });
+        if (
+          !roadmap ||
+          roadmap.ownerId !== ownerId ||
+          roadmap.kind !== expectedKind
+        ) {
+          throw badRequest('Focus row must reference a matching owned roadmap.');
+        }
       }),
     );
   }
@@ -113,11 +116,11 @@ focusRouter.put('/', requireAuth, async (req, res, next) => {
     set.weeklyFocusConfigured = true;
   }
 
-  const focus = await FocusModel.findOneAndUpdate(
-    { ownerId },
-    { $set: set },
-    { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true },
-  ).lean();
+  const focus = await db.focus.upsert({
+    where: { ownerId },
+    update: set,
+    create: { ownerId, ...set },
+  });
 
   res.json(toFocusDto(focus));
 });

@@ -3,7 +3,7 @@ import type { RequestHandler } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { env, hasDb } from '../config/env';
-import { UserModel } from '../models/index';
+import { db } from '../models/index';
 
 export const SESSION_COOKIE = 'roadatlas_session';
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
@@ -55,10 +55,10 @@ export function authConfigured(): boolean {
 }
 
 /**
- * Verifies credentials against the user collection. The configured administrator is
- * provisioned into that collection on first sign-in, so ownership always maps to a
- * real user id. Without a database the configured administrator still signs in, but
- * nothing is persisted — the API reports that state instead of pretending to save.
+ * Verifies credentials against the user table. With a database the user
+ * collection is the source of truth; without one the configured administrator
+ * still signs in, but nothing is persisted — the API reports that state instead
+ * of pretending to save.
  */
 export async function authenticateOwner(
   email: string,
@@ -70,12 +70,14 @@ export async function authenticateOwner(
 
   if (hasDb) {
     const adminEmail = (env.ADMIN_EMAIL ?? '').trim().toLowerCase();
-    const existing = await UserModel.findOne({ email: normalized });
+    const existing = await db.user.findFirst({
+      where: { email: normalized },
+    });
     if (existing) {
       const matches = await bcrypt.compare(password, existing.passwordHash);
       return matches
         ? {
-            id: String(existing._id),
+            id: existing.id,
             email: existing.email,
             sessionVersion: existing.sessionVersion ?? 0,
           }
@@ -88,22 +90,22 @@ export async function authenticateOwner(
 
     // The bootstrap may only create the first account. Provisioning is the
     // single-owner path; this fallback must never add a second user.
-    const otherUsers = await UserModel.countDocuments({ email: { $ne: adminEmail } });
+    const otherUsers = await db.user.count({
+      where: { email: { not: adminEmail } },
+    });
     if (otherUsers > 0) return null;
 
-    const created = await UserModel.findOneAndUpdate(
-      { email: adminEmail },
-      {
-        $setOnInsert: {
-          email: adminEmail,
-          passwordHash: env.ADMIN_PASSWORD_HASH,
-          sessionVersion: 0,
-        },
+    const created = await db.user.upsert({
+      where: { email: adminEmail },
+      update: {},
+      create: {
+        email: adminEmail,
+        passwordHash: env.ADMIN_PASSWORD_HASH as string,
+        sessionVersion: 0,
       },
-      { upsert: true, returnDocument: 'after' },
-    );
+    });
     return {
-      id: String(created._id),
+      id: created.id,
       email: created.email,
       sessionVersion: created.sessionVersion ?? 0,
     };
@@ -156,10 +158,12 @@ export async function readSession(token: unknown): Promise<SessionUser | null> {
   if (typeof payload.sv !== 'number') return null;
 
   if (hasDb) {
-    const user = await UserModel.findById(payload.sub).lean();
+    const user = await db.user.findUnique({
+      where: { id: payload.sub },
+    });
     if (!user) return null;
     if (payload.sv !== (user.sessionVersion ?? 0)) return null;
-    return { id: String(user._id), email: user.email };
+    return { id: user.id, email: user.email };
   }
 
   if (!env.ADMIN_EMAIL) return null;

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { MetricModel } from '../models/index';
+import { db } from '../models/index';
 import { notFound } from '../lib/api-error';
 import { parseOrThrow } from '../lib/parse';
 import { redactPublic, toMetricDto } from '../lib/dto';
@@ -20,11 +20,12 @@ metricsRouter.get('/', optionalAuth, async (req, res) => {
   const caller = optionalCallerId(res);
   if (techId) filter.techId = techId;
 
-  const docs = await MetricModel.find(filter).sort({ createdAt: 1 }).lean();
+  const docs = await db.metric.findMany({
+    where: filter,
+    orderBy: { createdAt: 'asc' },
+  });
   const items = docs.map((doc) => {
     const dto = toMetricDto(doc) as unknown as Record<string, unknown>;
-    // Only anonymous readers lose `ownerId`; signed-in callers need it to detect
-    // their own public records (ownership checks and edit affordances).
     if (!caller) {
       const rest = redactPublic(dto);
       return rest;
@@ -36,7 +37,9 @@ metricsRouter.get('/', optionalAuth, async (req, res) => {
 
 metricsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await MetricModel.findById(id).lean();
+  const doc = await db.metric.findUnique({
+    where: { id },
+  });
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Metric not found.');
   const dto = toMetricDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -51,8 +54,10 @@ metricsRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createMetricSchema, req.body);
   const ownerId = callerId(res);
 
-  const metric = await MetricModel.create({ ...input, ownerId });
-  res.status(201).json(toMetricDto(metric.toObject()));
+  const metric = await db.metric.create({
+    data: { ...input, ownerId },
+  });
+  res.status(201).json(toMetricDto(metric));
 });
 
 metricsRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -63,13 +68,12 @@ metricsRouter.patch('/:id', requireAuth, async (req, res) => {
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await MetricModel.findOneAndUpdate(
-    { _id: id, ownerId },
-    { $set: changes },
-    { returnDocument: 'after', runValidators: true },
-  ).lean();
+  const updated = await db.metric.update({
+    where: { id },
+    data: changes,
+  });
 
-  if (!updated) throw notFound('Metric not found.');
+  if (!updated || updated.ownerId !== ownerId) throw notFound('Metric not found.');
   res.json(toMetricDto(updated));
 });
 
@@ -77,7 +81,13 @@ metricsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const deleted = await MetricModel.findOneAndDelete({ _id: id, ownerId });
-  if (!deleted) throw notFound('Metric not found.');
+  const existing = await db.metric.findUnique({
+    where: { id },
+  });
+  if (!existing || existing.ownerId !== ownerId) throw notFound('Metric not found.');
+
+  await db.metric.delete({
+    where: { id },
+  });
   res.status(204).end();
 });

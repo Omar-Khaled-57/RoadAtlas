@@ -2,7 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { hasDb } from '../config/env';
-import { UserModel } from '../models/index';
+import { db } from '../models/index';
 import {
   authenticateOwner,
   authConfigured,
@@ -65,7 +65,10 @@ authRouter.post('/logout', async (req, res, next) => {
   try {
     const user = await readSession(req.cookies?.[SESSION_COOKIE]);
     if (user && hasDb) {
-      await UserModel.updateOne({ _id: user.id }, { $inc: { sessionVersion: 1 } });
+      await db.user.update({
+        where: { id: user.id },
+        data: { sessionVersion: { increment: 1 } },
+      });
     }
     res.clearCookie(SESSION_COOKIE, sessionCookieOptions(false));
     res.json({ authenticated: false, user: null });

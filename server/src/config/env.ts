@@ -6,7 +6,7 @@ const schema = z
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.coerce.number().default(4000),
     CLIENT_ORIGIN: z.string().url().optional(),
-    MONGODB_URI: z.string().optional(),
+    DATABASE_URL: z.string().optional(),
     JWT_SECRET: z.string().optional(),
     ADMIN_EMAIL: z.string().email().optional(),
     ADMIN_PASSWORD_HASH: z.string().optional(),
@@ -48,7 +48,7 @@ const schema = z
         }
       }
 
-      // A missing MONGODB_URI is deliberately not fatal: the server boots, health
+      // A missing DATABASE_URL is deliberately not fatal: the server boots, health
       // reports `database: "disabled"`, and data routes fail closed with 503 so
       // a misconfigured deployment stays diagnosable instead of returning a bare
       // function error on every request.
@@ -62,4 +62,4 @@ export const env = {
   // Only reachable in development/test — production requires CLIENT_ORIGIN explicitly.
   CLIENT_ORIGIN: parsed.CLIENT_ORIGIN ?? 'http://localhost:5173',
 };
-export const hasDb = Boolean(parsed.MONGODB_URI);
+export const hasDb = Boolean(parsed.DATABASE_URL);

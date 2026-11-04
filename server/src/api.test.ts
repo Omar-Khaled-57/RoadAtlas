@@ -2,7 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app';
 import { createSessionToken, SESSION_COOKIE } from './middleware/auth';
-import { UserModel } from './models/index';
+import { db } from './models/index';
 
 const app = createApp();
 const ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
@@ -22,8 +22,8 @@ async function createUser(email: string): Promise<{ id: string; email: string; t
   const passwordHash = await import('bcryptjs').then((bcrypt) =>
     bcrypt.default.hash('second-account-password', 10),
   );
-  const user = await UserModel.create({ email, passwordHash });
-  const session = { id: String(user._id), email: user.email };
+  const user = await db.user.create({ data: { email, passwordHash } });
+  const session = { id: user.id, email: user.email };
   return { ...session, token: createSessionToken(session) };
 }
 
@@ -36,16 +36,15 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  const models = await import('./models/index');
   await Promise.all([
-    models.RoadmapModel.deleteMany({}),
-    models.StepModel.deleteMany({}),
-    models.ProgressModel.deleteMany({}),
-    models.NoteModel.deleteMany({}),
-    models.MetricModel.deleteMany({}),
-    models.ComparisonModel.deleteMany({}),
-    models.DecisionModel.deleteMany({}),
-    models.FocusModel.deleteMany({}),
+    db.roadmap.deleteMany(),
+    db.step.deleteMany(),
+    db.progress.deleteMany(),
+    db.note.deleteMany(),
+    db.metric.deleteMany(),
+    db.comparison.deleteMany(),
+    db.decision.deleteMany(),
+    db.focus.deleteMany(),
   ]);
 });
 
@@ -143,7 +142,7 @@ describe('roadmap ownership', () => {
     const orphan = await call('post', '/api/roadmaps', { token: owner.token }).send({
       kind: 'hub',
       title: { en: 'Orphan' },
-      parentId: '665f1f77bcf86cd799439999',
+      parentId: '00000000-0000-0000-0000-000000000000',
     });
     expect(orphan.status).toBe(400);
 

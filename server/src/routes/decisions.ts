@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { DecisionModel } from '../models/index';
+import { db } from '../models/index';
 import { notFound } from '../lib/api-error';
 import { parseOrThrow } from '../lib/parse';
 import { redactPublic, toDecisionDto } from '../lib/dto';
@@ -19,11 +19,12 @@ decisionsRouter.get('/', optionalAuth, async (req, res) => {
   const filter = scopeFilter(scope, optionalCallerId(res));
   const caller = optionalCallerId(res);
 
-  const docs = await DecisionModel.find(filter).sort({ createdAt: -1 }).lean();
+  const docs = await db.decision.findMany({
+    where: filter,
+    orderBy: { createdAt: 'desc' },
+  });
   const items = docs.map((doc) => {
     const dto = toDecisionDto(doc) as unknown as Record<string, unknown>;
-    // Only anonymous readers lose `ownerId`; signed-in callers need it to detect
-    // their own public records (ownership checks and edit affordances).
     if (!caller) {
       const rest = redactPublic(dto);
       return rest;
@@ -35,7 +36,9 @@ decisionsRouter.get('/', optionalAuth, async (req, res) => {
 
 decisionsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await DecisionModel.findById(id).lean();
+  const doc = await db.decision.findUnique({
+    where: { id },
+  });
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Decision not found.');
   const dto = toDecisionDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -50,8 +53,10 @@ decisionsRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createDecisionSchema, req.body);
   const ownerId = callerId(res);
 
-  const decision = await DecisionModel.create({ ...input, ownerId });
-  res.status(201).json(toDecisionDto(decision.toObject()));
+  const decision = await db.decision.create({
+    data: { ...input, ownerId },
+  });
+  res.status(201).json(toDecisionDto(decision));
 });
 
 decisionsRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -62,13 +67,12 @@ decisionsRouter.patch('/:id', requireAuth, async (req, res) => {
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await DecisionModel.findOneAndUpdate(
-    { _id: id, ownerId },
-    { $set: changes },
-    { returnDocument: 'after', runValidators: true },
-  ).lean();
+  const updated = await db.decision.update({
+    where: { id },
+    data: changes,
+  });
 
-  if (!updated) throw notFound('Decision not found.');
+  if (!updated || updated.ownerId !== ownerId) throw notFound('Decision not found.');
   res.json(toDecisionDto(updated));
 });
 
@@ -76,7 +80,13 @@ decisionsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const deleted = await DecisionModel.findOneAndDelete({ _id: id, ownerId });
-  if (!deleted) throw notFound('Decision not found.');
+  const existing = await db.decision.findUnique({
+    where: { id },
+  });
+  if (!existing || existing.ownerId !== ownerId) throw notFound('Decision not found.');
+
+  await db.decision.delete({
+    where: { id },
+  });
   res.status(204).end();
 });
