@@ -8,7 +8,7 @@
     "db:generate": "prisma generate",
     "db:dev": "node scripts/dev-db.mjs",
     "build": "npm run db:generate && tsup src/index.ts --format esm --target node20 --out-dir dist --clean",
-    "build:api": "esbuild src/serverless.ts --bundle --platform=node --format=cjs --target=node22 --packages=external --outfile=../api/_server.cjs",
+    "build:api": "npm run db:generate && esbuild src/serverless.ts --bundle --platform=node --format=cjs --target=node22 --packages=external --outfile=../api/_server.cjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
