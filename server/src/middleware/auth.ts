@@ -14,6 +14,10 @@ export interface SessionUser {
   email: string;
 }
 
+interface SessionRecord extends SessionUser {
+  sessionVersion: number;
+}
+
 export function sessionCookieOptions(includeMaxAge = true) {
   return {
     httpOnly: true,
@@ -59,7 +63,7 @@ export function authConfigured(): boolean {
 export async function authenticateOwner(
   email: string,
   password: string,
-): Promise<SessionUser | null> {
+): Promise<SessionRecord | null> {
   if (!authConfigured()) return null;
 
   const normalized = email.trim().toLowerCase();
@@ -69,19 +73,40 @@ export async function authenticateOwner(
     const existing = await UserModel.findOne({ email: normalized });
     if (existing) {
       const matches = await bcrypt.compare(password, existing.passwordHash);
-      return matches ? { id: String(existing._id), email: existing.email } : null;
+      return matches
+        ? {
+            id: String(existing._id),
+            email: existing.email,
+            sessionVersion: existing.sessionVersion ?? 0,
+          }
+        : null;
     }
 
     if (!hasEnvAdmin() || normalized !== adminEmail) return null;
     const matches = await bcrypt.compare(password, env.ADMIN_PASSWORD_HASH as string);
     if (!matches) return null;
 
+    // The bootstrap may only create the first account. Provisioning is the
+    // single-owner path; this fallback must never add a second user.
+    const otherUsers = await UserModel.countDocuments({ email: { $ne: adminEmail } });
+    if (otherUsers > 0) return null;
+
     const created = await UserModel.findOneAndUpdate(
       { email: adminEmail },
-      { $setOnInsert: { email: adminEmail, passwordHash: env.ADMIN_PASSWORD_HASH } },
+      {
+        $setOnInsert: {
+          email: adminEmail,
+          passwordHash: env.ADMIN_PASSWORD_HASH,
+          sessionVersion: 0,
+        },
+      },
       { upsert: true, returnDocument: 'after' },
     );
-    return { id: String(created._id), email: created.email };
+    return {
+      id: String(created._id),
+      email: created.email,
+      sessionVersion: created.sessionVersion ?? 0,
+    };
   }
 
   if (!hasEnvAdmin()) return null;
@@ -90,19 +115,23 @@ export async function authenticateOwner(
   const passwordMatches = await bcrypt.compare(password, env.ADMIN_PASSWORD_HASH as string);
   if (!emailMatches || !passwordMatches) return null;
 
-  return { id: ownerIdFromEmail(adminEmail), email: adminEmail };
+  return { id: ownerIdFromEmail(adminEmail), email: adminEmail, sessionVersion: 0 };
 }
 
-export function createSessionToken(user: SessionUser): string {
+export function createSessionToken(user: SessionUser & { sessionVersion?: number }): string {
   if (!env.JWT_SECRET || env.JWT_SECRET.length < 32) {
     throw new Error('Authentication is not configured.');
   }
 
-  return jwt.sign({ email: user.email }, env.JWT_SECRET, {
+  return jwt.sign({ email: user.email, sv: user.sessionVersion ?? 0 }, env.JWT_SECRET, {
     subject: user.id,
     issuer: JWT_ISSUER,
     expiresIn: SESSION_SECONDS,
   });
+}
+
+export function publicSessionUser(user: SessionUser): SessionUser {
+  return { id: user.id, email: user.email };
 }
 
 /**
@@ -124,16 +153,18 @@ export async function readSession(token: unknown): Promise<SessionUser | null> {
   }
 
   if (typeof payload === 'string' || typeof payload.sub !== 'string') return null;
+  if (typeof payload.sv !== 'number') return null;
 
   if (hasDb) {
     const user = await UserModel.findById(payload.sub).lean();
     if (!user) return null;
+    if (payload.sv !== (user.sessionVersion ?? 0)) return null;
     return { id: String(user._id), email: user.email };
   }
 
   if (!env.ADMIN_EMAIL) return null;
   const adminId = ownerIdFromEmail(env.ADMIN_EMAIL);
-  if (payload.sub !== adminId) return null;
+  if (payload.sub !== adminId || payload.sv !== 0) return null;
   return { id: adminId, email: env.ADMIN_EMAIL };
 }
 

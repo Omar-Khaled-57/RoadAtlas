@@ -48,15 +48,10 @@ const schema = z
         }
       }
 
-      // Without a database the configured administrator is the only account the
-      // server can authenticate; with one, users are provisioned in the database.
-      if (!values.MONGODB_URI && !values.ADMIN_EMAIL) {
-        context.addIssue({
-          code: 'custom',
-          path: ['ADMIN_EMAIL'],
-          message: 'Required in production when MONGODB_URI is not set.',
-        });
-      }
+      // A missing MONGODB_URI is deliberately not fatal: the server boots, health
+      // reports `database: "disabled"`, and data routes fail closed with 503 so
+      // a misconfigured deployment stays diagnosable instead of returning a bare
+      // function error on every request.
     }
   });
 

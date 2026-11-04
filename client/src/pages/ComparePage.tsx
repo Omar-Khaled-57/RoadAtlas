@@ -1,27 +1,26 @@
 import {
   ArrowRight,
+  ArrowUpRight,
   BadgeCheck,
   Check,
   ExternalLink,
   Minus,
   Plus,
   Scale,
+  Settings,
   TriangleAlert,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageMeta } from '../lib/seo';
 
-import { Link } from 'react-router-dom';
-import {
-  getComparison,
-  getTechProfile,
-  weightedScore,
-  type ComparisonSeed,
-  type TechProfile,
-} from '../data/comparisons';
+import { Link, useParams } from 'react-router-dom';
+import type { Comparison } from '@shared/index';
+import { techProfiles, type TechProfile } from '../data/techCatalogue';
+import { weightedScore } from '../data/comparisons';
 import { formatDate } from '../lib/format';
 import { localize } from '../lib/localize';
+import { useComparison, useComparisons, useSession } from '../data/queries';
 
 const TH = 'border-b border-border-subtle px-4 py-3 text-start align-top';
 const TD = 'border-b border-border-subtle px-4 py-3 text-start align-top';
@@ -30,7 +29,75 @@ export function ComparePage() {
   usePageMeta({ titleKey: 'seo.compare.title', descriptionKey: 'seo.compare.description' });
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const comparison = getComparison(undefined);
+  const { id } = useParams();
+  const { data: comparisons = [] } = useComparisons('public');
+  const { data: comparisonData, isLoading: comparisonLoading } = useComparison(id);
+  const comparison = id ? comparisonData : comparisons[0];
+  const { data: session } = useSession();
+  const ownerId = comparison?.ownerId;
+  const isOwner = Boolean(session?.authenticated && ownerId && session.user?.id === ownerId);
+
+  if (!id) {
+    return (
+      <div className="page-enter space-y-6">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="section-eyebrow">{t('compare.eyebrow')}</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight">{t('compare.title')}</h1>
+            <p className="mt-2 max-w-2xl text-sm text-fg-muted">{t('compare.subtitle')}</p>
+          </div>
+        </header>
+        {comparisons.length > 0 ? (
+          <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            {comparisons.map((item) => (
+              <li key={item.id}>
+                <article className="roadmap-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="roadmap-icon tone-accent">
+                      <Scale aria-hidden="true" />
+                    </span>
+                    <ArrowUpRight
+                      className="h-4 w-4 text-fg-muted rtl:-scale-x-100"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <h2 className="mt-5 font-bold">{localize(item.title, lang)}</h2>
+                  <p className="mt-1 line-clamp-2 min-h-8 text-xs text-fg-muted">
+                    {t('compare.candidates', { value: item.candidateTechIds?.length || 0 })}
+                  </p>
+                  <Link
+                    to={`/compare/${item.id}`}
+                    className="stretched-link"
+                    aria-label={localize(item.title, lang)}
+                  />
+                </article>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <section className="surface-card p-10 text-center">
+            <h1 className="text-2xl font-bold">{t('compare.notFound.title')}</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
+              {t('compare.notFound.body')}
+            </p>
+            <Link to="/about" className="primary-button mt-5">
+              {t('compare.notFound.cta')}
+            </Link>
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  if (id && comparisonLoading) {
+    return (
+      <div className="page-enter space-y-6">
+        <p role="status" className="text-sm text-fg-muted">
+          {t('common.loading')}
+        </p>
+      </div>
+    );
+  }
 
   if (!comparison) {
     return (
@@ -40,24 +107,41 @@ export function ComparePage() {
           <p className="mx-auto mt-2 max-w-md text-sm text-fg-muted">
             {t('compare.notFound.body')}
           </p>
-          <Link to="/about" className="primary-button mt-5">
-            {t('compare.notFound.cta')}
+          <Link to="/compare" className="primary-button mt-5">
+            {t('compare.back')}
           </Link>
         </section>
       </div>
     );
   }
 
-  return <ComparisonView comparison={comparison} lang={lang} />;
+  return (
+    <div className="page-enter space-y-6">
+      <Link
+        to="/compare"
+        className="inline-flex min-h-6 items-center gap-2 text-sm text-fg-muted hover:text-fg-primary"
+      >
+        <ArrowRight className="h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />
+        {t('compare.back')}
+      </Link>
+      {isOwner ? (
+        <div className="flex justify-end">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border-default px-3 py-1 text-xs font-semibold text-fg-muted">
+            <Settings className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('workspace.ownerControls')}
+          </span>
+        </div>
+      ) : null}
+      <ComparisonView comparison={comparison} lang={lang} />
+    </div>
+  );
 }
 
-function ComparisonView({ comparison, lang }: { comparison: ComparisonSeed; lang: string }) {
+function ComparisonView({ comparison, lang }: { comparison: Comparison; lang: string }) {
   const { t } = useTranslation();
-  const [selected, setSelected] = useState<string[]>(comparison.candidateTechIds);
+  const [selected, setSelected] = useState<string[]>(comparison.candidateTechIds || []);
 
-  const pool = comparison.candidateTechIds
-    .map((id) => getTechProfile(id))
-    .filter((tech): tech is TechProfile => Boolean(tech));
+  const pool = techProfiles;
   const techs = pool.filter((tech) => selected.includes(tech.id));
   const enough = techs.length >= 2;
 
@@ -141,7 +225,7 @@ function CriteriaTable({
   techs,
   lang,
 }: {
-  comparison: ComparisonSeed;
+  comparison: Comparison;
   techs: TechProfile[];
   lang: string;
 }) {
@@ -234,14 +318,25 @@ function CriteriaTable({
 
 function TechQualities({ techs, lang }: { techs: TechProfile[]; lang: string }) {
   const { t } = useTranslation();
+  const count = techs.length;
   return (
     <section aria-labelledby="compare-qualities" className="space-y-4">
       <h2 id="compare-qualities" className="text-2xl font-bold">
         {t('compare.qualities')}
       </h2>
-      <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+      <ul
+        className={`mx-auto grid w-full list-none justify-center gap-4 p-0 ${
+          count === 1
+            ? 'max-w-4xl grid-cols-1'
+            : count === 2
+              ? 'max-w-6xl grid-cols-1 md:grid-cols-2'
+              : count === 3
+                ? 'max-w-7xl grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'max-w-7xl grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+        }`}
+      >
         {techs.map((tech) => (
-          <li key={tech.id} className="surface-card p-6">
+          <li key={tech.id} className="surface-card h-full p-6">
             <div className="flex items-center gap-3">
               <span className={`icon-tile tone-${tech.tone}`} aria-hidden="true">
                 <Scale />
@@ -280,6 +375,7 @@ function TechQualities({ techs, lang }: { techs: TechProfile[]; lang: string }) 
 
 function FrictionSection({ techs, lang }: { techs: TechProfile[]; lang: string }) {
   const { t } = useTranslation();
+  const count = techs.length;
   return (
     <section aria-labelledby="compare-friction" className="surface-card p-6">
       <div className="flex items-start gap-3">
@@ -293,9 +389,19 @@ function FrictionSection({ techs, lang }: { techs: TechProfile[]; lang: string }
           <p className="mt-1 text-sm text-fg-muted">{t('compare.frictionIntro')}</p>
         </div>
       </div>
-      <ul className="mt-5 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
+      <ul
+        className={`mt-5 mx-auto grid w-full list-none justify-center gap-4 p-0 ${
+          count === 1
+            ? 'max-w-4xl grid-cols-1'
+            : count === 2
+              ? 'max-w-6xl grid-cols-1 md:grid-cols-2'
+              : count === 3
+                ? 'max-w-7xl grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'max-w-7xl grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+        }`}
+      >
         {techs.map((tech) => (
-          <li key={tech.id}>
+          <li key={tech.id} className="h-full">
             <h3 className="font-semibold">{localize(tech.name, lang)}</h3>
             <ul className="mt-2 space-y-1.5">
               {tech.friction.map((item) => (
@@ -316,7 +422,7 @@ function ConclusionSection({
   techs,
   lang,
 }: {
-  comparison: ComparisonSeed;
+  comparison: Comparison;
   techs: TechProfile[];
   lang: string;
 }) {
@@ -337,7 +443,9 @@ function ConclusionSection({
         {localize(comparison.conclusion, lang)}
       </p>
       <p className="mt-3 text-xs text-fg-muted">
-        {t('compare.revisit', { date: formatDate(comparison.revisitAt, lang) })}
+        {comparison.revisitAt
+          ? t('compare.revisit', { date: formatDate(comparison.revisitAt, lang) })
+          : null}
       </p>
       <Link
         to="/decisions"
@@ -350,16 +458,16 @@ function ConclusionSection({
   );
 }
 
-function EvidenceSection({ comparison }: { comparison: ComparisonSeed }) {
+function EvidenceSection({ comparison }: { comparison: Comparison }) {
   const { t } = useTranslation();
-  if (comparison.evidence.length === 0) return null;
+  if ((comparison.evidence ?? []).length === 0) return null;
   return (
     <section aria-labelledby="compare-evidence" className="surface-card p-6">
       <h2 id="compare-evidence" className="text-2xl font-bold">
         {t('compare.evidence')}
       </h2>
       <ul className="mt-3 flex list-none flex-wrap gap-x-6 gap-y-2 p-0">
-        {comparison.evidence.map((item) => (
+        {(comparison.evidence ?? []).map((item) => (
           <li key={item.url}>
             <a
               href={item.url}

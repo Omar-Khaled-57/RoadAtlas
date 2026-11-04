@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import {
+  comparisonsApi,
   decisionsApi,
   focusApi,
+  metricsApi,
   notesApi,
   roadmapsApi,
   stepsApi,
@@ -14,6 +16,7 @@ import {
 } from './api';
 import type {
   AuthSession,
+  Comparison,
   DecisionRecord,
   ID,
   LocalizedString,
@@ -35,13 +38,20 @@ export function useSession() {
 }
 
 export const ownerRoadmapsQueryKey = ['roadmaps', 'owner'] as const;
+export const publicRoadmapsQueryKey = ['roadmaps', 'public'] as const;
+
+export function useHomeRoadmaps(owner: boolean) {
+  return useQuery({
+    queryKey: owner ? ownerRoadmapsQueryKey : publicRoadmapsQueryKey,
+    queryFn: () => roadmapsApi.list(owner ? 'owner' : 'public'),
+  });
+}
 
 export function useOwnerRoadmaps(enabled: boolean) {
   return useQuery({
     queryKey: ownerRoadmapsQueryKey,
     queryFn: () => roadmapsApi.list('owner'),
     enabled,
-    retry: false,
   });
 }
 
@@ -50,7 +60,6 @@ export function useOwnerRoadmap(id: ID | undefined) {
     queryKey: ['roadmaps', id],
     queryFn: () => roadmapsApi.get(id as ID),
     enabled: Boolean(id),
-    retry: false,
   });
 }
 
@@ -59,16 +68,14 @@ export function useRoadmapSteps(id: ID | undefined) {
     queryKey: ['roadmaps', id, 'steps'],
     queryFn: () => roadmapsApi.steps(id as ID),
     enabled: Boolean(id),
-    retry: false,
   });
 }
 
-export function useRoadmapProgress(id: ID | undefined) {
+export function useRoadmapProgress(id: ID | undefined, enabled = Boolean(id)) {
   return useQuery({
     queryKey: ['roadmaps', id, 'progress'],
     queryFn: () => roadmapsApi.progress(id as ID),
-    enabled: Boolean(id),
-    retry: false,
+    enabled: Boolean(id) && enabled,
   });
 }
 
@@ -77,7 +84,6 @@ export function useFocus(enabled: boolean) {
     queryKey: ['focus'],
     queryFn: focusApi.get,
     enabled,
-    retry: false,
   });
 }
 
@@ -110,6 +116,12 @@ export function useUpdateRoadmap() {
       void queryClient.invalidateQueries({ queryKey: ownerRoadmapsQueryKey });
       void queryClient.invalidateQueries({ queryKey: ['roadmaps', roadmap.id] });
     },
+    onError: (error: { status?: number }) => {
+      if (error.status === 409) {
+        // Revision conflict: invalidate so the user sees current state on retry.
+        void queryClient.invalidateQueries({ queryKey: ownerRoadmapsQueryKey });
+      }
+    },
   });
 }
 
@@ -135,11 +147,50 @@ export function useAddStep() {
   });
 }
 
+export function useUpdateStep() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: ID; roadmapId: ID; input: Partial<StepInput> }) =>
+      stepsApi.update(id, input),
+    onSuccess: (_step, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['roadmaps', variables.roadmapId, 'steps'] });
+    },
+    onError: (error: { status?: number }) => {
+      if (error.status === 409) {
+        void queryClient.invalidateQueries({ queryKey: ownerRoadmapsQueryKey });
+      }
+    },
+  });
+}
+
+export function useDeleteStep() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: ID; roadmapId: ID }) => stepsApi.remove(id),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['roadmaps', variables.roadmapId, 'steps'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['roadmaps', variables.roadmapId, 'progress'],
+      });
+    },
+  });
+}
+
 export function useSetStepProgress() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ stepId, done }: { roadmapId: ID; stepId: ID; done: boolean }) =>
-      stepsApi.setProgress(stepId, done),
+    mutationFn: ({
+      stepId,
+      done,
+      status,
+      percent,
+    }: {
+      roadmapId: ID;
+      stepId: ID;
+      done?: boolean;
+      status?: string;
+      percent?: number;
+    }) => stepsApi.setProgress(stepId, { done, status, percent }),
     onSuccess: (_progress: Progress, variables) => {
       void queryClient.invalidateQueries({
         queryKey: ['roadmaps', variables.roadmapId, 'progress'],
@@ -153,8 +204,11 @@ export interface RoadmapDraft {
   title: string;
   titleAr: string;
   description: string;
+  topics: string;
   kind: 'hub' | 'tech' | 'pipeline';
   visibility: Visibility;
+  /** Catalogue id (`t-react`, …) for technology roadmaps. */
+  techId: string;
 }
 
 /** Turns the plain form fields into the localized payload the API expects. */
@@ -168,6 +222,11 @@ export function toRoadmapInput(draft: RoadmapDraft): RoadmapInput {
     kind: draft.kind,
     visibility: draft.visibility,
     ...(draft.description ? { description: { en: draft.description } } : {}),
+    ...(draft.kind === 'tech' && draft.techId ? { techId: draft.techId } : {}),
+    topics: draft.topics
+      .split(',')
+      .map((topic) => topic.trim())
+      .filter(Boolean),
   };
 }
 
@@ -180,7 +239,6 @@ export function usePublicNotes() {
   return useQuery({
     queryKey: publicNotesQueryKey,
     queryFn: () => notesApi.list('public'),
-    retry: false,
   });
 }
 
@@ -189,7 +247,6 @@ export function useOwnerNotes(enabled: boolean) {
     queryKey: ownerNotesQueryKey,
     queryFn: () => notesApi.list('owner'),
     enabled,
-    retry: false,
   });
 }
 
@@ -198,7 +255,6 @@ export function useNote(id: ID | undefined) {
     queryKey: ['notes', id],
     queryFn: () => notesApi.get(id as ID),
     enabled: Boolean(id),
-    retry: false,
   });
 }
 
@@ -247,7 +303,6 @@ export function usePublicDecisions() {
   return useQuery({
     queryKey: publicDecisionsQueryKey,
     queryFn: () => decisionsApi.list('public'),
-    retry: false,
   });
 }
 
@@ -256,7 +311,6 @@ export function useOwnerDecisions(enabled: boolean) {
     queryKey: ownerDecisionsQueryKey,
     queryFn: () => decisionsApi.list('owner'),
     enabled,
-    retry: false,
   });
 }
 
@@ -265,7 +319,6 @@ export function useDecision(id: ID | undefined) {
     queryKey: ['decisions', id],
     queryFn: () => decisionsApi.get(id as ID),
     enabled: Boolean(id),
-    retry: false,
   });
 }
 
@@ -307,5 +360,72 @@ export function useDeleteDecision() {
       );
       void queryClient.invalidateQueries({ queryKey: ['decisions'] });
     },
+  });
+}
+
+export function useComparisons(scope: 'public' | 'owner' = 'public') {
+  const { data: session } = useSession();
+  const enabled = scope === 'public' || Boolean(session?.authenticated);
+  return useQuery({
+    queryKey: ['comparisons', scope],
+    queryFn: () => comparisonsApi.list(scope),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useComparison(id?: ID) {
+  const enabled = Boolean(id);
+  return useQuery({
+    queryKey: ['comparisons', id],
+    queryFn: () => comparisonsApi.getById(id as ID),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateComparison() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<Comparison>) => comparisonsApi.create(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+    },
+  });
+}
+
+export function useUpdateComparison() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: ID; input: Partial<Comparison> }) =>
+      comparisonsApi.update(id, input),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+      void queryClient.invalidateQueries({ queryKey: ['comparisons', variables.id] });
+    },
+  });
+}
+
+export function useDeleteComparison() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: ID) => comparisonsApi.remove(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['comparisons'] });
+    },
+  });
+}
+
+export const publicMetricsQueryKey = ['metrics', 'public'] as const;
+export const ownerMetricsQueryKey = ['metrics', 'owner'] as const;
+
+export function useMetrics(scope: 'public' | 'owner' = 'public') {
+  const { data: session } = useSession();
+  const enabled = scope === 'public' || Boolean(session?.authenticated);
+  return useQuery({
+    queryKey: ['metrics', scope],
+    queryFn: () => metricsApi.list(scope),
+    enabled,
+    staleTime: 60_000,
   });
 }

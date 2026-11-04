@@ -17,7 +17,8 @@ describe('createApp', () => {
   it('returns 404 JSON for unknown API routes', async () => {
     const res = await request(app).get('/api/nope');
     expect(res.status).toBe(404);
-    expect(res.body.message).toMatch(/^Not found: GET \/api\/nope$/);
+    expect(res.body.message).toBe('Not found.');
+    expect(res.body.message).not.toContain('/api/nope');
     expect(res.body.requestId).toBe(res.headers['x-request-id']);
   });
 

@@ -1,0 +1,124 @@
+{
+  "hub": {
+    "key": "stack",
+    "title": {
+      "en": "My Tech Stack",
+      "ar": "مجموعتي التقنية"
+    },
+    "description": {
+      "en": "The tools I actually build with, grouped in one place.",
+      "ar": "الأدوات التي أبني بها فعليًا، مجموعة في مكان واحد."
+    },
+    "order": 0
+  },
+  "children": [
+    {
+      "key": "stack-react",
+      "title": {
+        "en": "React",
+        "ar": "رياكت"
+      },
+      "description": {
+        "en": "Component-based UI library used for most interfaces.",
+        "ar": "مكتبة واجهات مبنية على المكوّنات تُستخدم في معظم الواجهات."
+      },
+      "techId": "t-react"
+    },
+    {
+      "key": "stack-typescript",
+      "title": {
+        "en": "TypeScript",
+        "ar": "تايب سكريبت"
+      },
+      "description": {
+        "en": "Typed JavaScript that keeps larger codebases predictable.",
+        "ar": "جافاسكريبت بأسلوب الأنواع يجعل المشاريع الكبيرة أكثر تنبؤًا."
+      },
+      "techId": "t-typescript"
+    },
+    {
+      "key": "stack-nextjs",
+      "title": {
+        "en": "Next.js",
+        "ar": "نكست جي إس"
+      },
+      "description": {
+        "en": "React framework for routing, rendering and deployment.",
+        "ar": "إطار عمل لرياكت للتوجيه والعرض والنشر."
+      },
+      "techId": "t-nextjs"
+    },
+    {
+      "key": "stack-tailwind",
+      "title": {
+        "en": "Tailwind CSS",
+        "ar": "تيلويند سي إس إس"
+      },
+      "description": {
+        "en": "Utility-first CSS that keeps styling close to the markup.",
+        "ar": "سي إس إس قائم على الأدوات المساعدة يبقي التنسيق قريبًا من البنية."
+      },
+      "techId": "t-tailwind"
+    },
+    {
+      "key": "stack-node",
+      "title": {
+        "en": "Node.js",
+        "ar": "نود جي إس"
+      },
+      "description": {
+        "en": "JavaScript runtime behind the server-side code.",
+        "ar": "بيئة تشغيل جافاسكريبت خلف الكود الخادمي."
+      },
+      "techId": "t-nodejs"
+    },
+    {
+      "key": "stack-express",
+      "title": {
+        "en": "Express",
+        "ar": "إكسبريس"
+      },
+      "description": {
+        "en": "Minimal HTTP framework for the REST API.",
+        "ar": "إطار عمل HTTP بسيط لواجهة REST."
+      },
+      "techId": "t-expressjs"
+    },
+    {
+      "key": "stack-postgres",
+      "title": {
+        "en": "PostgreSQL",
+        "ar": "بوستجريس"
+      },
+      "description": {
+        "en": "Relational database for structured application data.",
+        "ar": "قاعدة بيانات علائقية لبيانات التطبيق المنظمة."
+      },
+      "techId": "t-postgresql"
+    },
+    {
+      "key": "stack-supabase",
+      "title": {
+        "en": "Supabase",
+        "ar": "سوبابيس"
+      },
+      "description": {
+        "en": "Hosted Postgres with auth, storage and realtime built in.",
+        "ar": "بوستجريس مُستضاف مع المصادقة والتخزين والتحديث الفوري."
+      },
+      "techId": "t-supabase"
+    },
+    {
+      "key": "stack-vercel",
+      "title": {
+        "en": "Vercel",
+        "ar": "فيرسل"
+      },
+      "description": {
+        "en": "Where the front end and API are deployed.",
+        "ar": "حيث يتم نشر الواجهة وواجهة البرمجة."
+      },
+      "techId": "t-vercel"
+    }
+  ]
+}

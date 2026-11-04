@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { DecisionModel } from '../models/index';
 import { notFound } from '../lib/api-error';
 import { parseOrThrow } from '../lib/parse';
-import { toDecisionDto } from '../lib/dto';
+import { redactPublic, toDecisionDto } from '../lib/dto';
 import { callerId, isReadable, optionalCallerId, scopeFilter } from '../lib/scope';
 import { optionalAuth, requireAuth } from '../middleware/auth';
 import {
@@ -17,16 +17,33 @@ export const decisionsRouter = Router();
 decisionsRouter.get('/', optionalAuth, async (req, res) => {
   const { scope = 'public' } = parseOrThrow(listQuerySchema, req.query);
   const filter = scopeFilter(scope, optionalCallerId(res));
+  const caller = optionalCallerId(res);
 
   const docs = await DecisionModel.find(filter).sort({ createdAt: -1 }).lean();
-  res.json({ items: docs.map(toDecisionDto) });
+  const items = docs.map((doc) => {
+    const dto = toDecisionDto(doc) as unknown as Record<string, unknown>;
+    // Only anonymous readers lose `ownerId`; signed-in callers need it to detect
+    // their own public records (ownership checks and edit affordances).
+    if (!caller) {
+      const rest = redactPublic(dto);
+      return rest;
+    }
+    return dto;
+  });
+  res.json({ items });
 });
 
 decisionsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const doc = await DecisionModel.findById(id).lean();
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Decision not found.');
-  res.json(toDecisionDto(doc));
+  const dto = toDecisionDto(doc) as unknown as Record<string, unknown>;
+  if (doc.visibility === 'public' && !optionalCallerId(res)) {
+    const rest = redactPublic(dto);
+    res.json(rest);
+    return;
+  }
+  res.json(dto);
 });
 
 decisionsRouter.post('/', requireAuth, async (req, res) => {

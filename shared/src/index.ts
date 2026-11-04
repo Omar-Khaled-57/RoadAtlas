@@ -39,6 +39,7 @@ export interface Tech extends Timestamps {
 }
 
 export type RoadmapKind = 'hub' | 'tech' | 'pipeline';
+export type RoadmapStatus = 'planned' | 'in_progress' | 'finished' | 'paused';
 
 export interface Roadmap extends Timestamps {
   id: ID;
@@ -50,6 +51,13 @@ export interface Roadmap extends Timestamps {
   parentId?: ID;
   techId?: ID;
   order: number;
+  prerequisites?: string[];
+  topics?: string[];
+  paused?: boolean;
+  status?: RoadmapStatus;
+  icon?: string;
+  image?: string;
+  revision?: number;
 }
 
 export type PipelineStage = 'idea' | 'design' | 'build' | 'ship' | 'done';
@@ -63,6 +71,11 @@ export interface Step extends Timestamps {
   resources: Link[];
   order: number;
   stage?: PipelineStage;
+  note?: LocalizedString;
+  done?: boolean;
+  revision?: number;
+  linkedRoadmapId?: ID | null;
+  linkedStepId?: ID | null;
 }
 
 export interface CriterionScore {
@@ -85,6 +98,10 @@ export interface Comparison extends Timestamps {
   candidateTechIds: ID[];
   criteria: Criterion[];
   conclusion?: LocalizedString;
+  chosenTechId?: ID | null;
+  revisitAt?: string;
+  evidence?: Link[];
+  revision?: number;
 }
 
 export interface MetricAxis {
@@ -107,6 +124,8 @@ export interface Metric extends Timestamps {
   axis: MetricAxis;
   points: MetricPoint[];
   finding: LocalizedString;
+  evidence?: Link[];
+  revision?: number;
 }
 
 export type NoteTarget = 'roadmap' | 'step' | 'tech' | 'decision';
@@ -121,6 +140,7 @@ export interface Note extends Timestamps {
   content: LocalizedString;
   tags: string[];
   references: string[];
+  revision?: number;
 }
 
 export interface DecisionRecord extends Timestamps {
@@ -133,6 +153,7 @@ export interface DecisionRecord extends Timestamps {
   consequences: LocalizedString;
   revisitAt?: string;
   links: Link[];
+  revision?: number;
 }
 
 export interface FocusLastVisited {
@@ -141,21 +162,47 @@ export interface FocusLastVisited {
   at: string;
 }
 
+export type FocusItemKind = 'technology' | 'project' | 'milestone' | 'custom';
+
+/** A home focus row points at persisted roadmap or step content. */
+export interface FocusItem {
+  id: ID;
+  kind: FocusItemKind;
+  targetId: ID;
+  highlighted: boolean;
+  title?: LocalizedString;
+  href?: string;
+}
+
+export interface WeeklyFocusItem {
+  id: ID;
+  title: LocalizedString;
+  highlighted: boolean;
+}
+
 export interface Focus {
   ownerId: ID;
   visibility: Visibility;
   currentTechId?: ID;
   currentProjectId?: ID;
   lastVisited?: FocusLastVisited;
+  items: FocusItem[];
+  weeklyFocus?: WeeklyFocusItem[];
+  revision?: number;
   updatedAt: string;
 }
+
+export type StepProgressStatus =
+  'not_started' | 'in_progress' | 'partially_done' | 'done' | 'revisit' | 'test' | 'revise';
 
 export interface Progress extends Timestamps {
   id: ID;
   ownerId: ID;
   stepId: ID;
   done: boolean;
-  completedAt?: string;
+  status?: StepProgressStatus;
+  percent?: number;
+  completedAt?: string | null;
 }
 
 export interface ApiError {

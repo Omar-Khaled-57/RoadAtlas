@@ -26,7 +26,7 @@ export const visibilityField = {
   type: String,
   enum: VISIBILITIES,
   required: true,
-  default: 'private',
+  default: 'public',
 } as const;
 
 export const ownerIdField = {

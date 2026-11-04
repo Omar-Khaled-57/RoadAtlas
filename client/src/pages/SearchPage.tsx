@@ -4,17 +4,18 @@ import { useTranslation } from 'react-i18next';
 import { usePageMeta } from '../lib/seo';
 
 import { Link } from 'react-router-dom';
-import { seedComparisons, seedTechProfiles } from '../data/comparisons';
-import { seedMetrics } from '../data/curves';
-import { seedRoadmaps } from '../data/roadmaps';
 import {
+  useComparisons,
+  useMetrics,
   useOwnerDecisions,
   useOwnerNotes,
   usePublicDecisions,
   usePublicNotes,
   useSession,
 } from '../data/queries';
+import { useRoadmapGraph } from '../data/roadmapGraph';
 import { localize } from '../lib/localize';
+import { techProfiles } from '../data/techCatalogue';
 import type { DecisionRecord, Note } from '@shared/index';
 
 type EntityType = 'roadmap' | 'step' | 'tech' | 'comparison' | 'curve' | 'note' | 'decision';
@@ -74,6 +75,10 @@ export default function SearchPage() {
     });
   }, [ownerDecisions, publicDecisions]);
 
+  const { roadmaps } = useRoadmapGraph();
+  const { data: comparisons = [] } = useComparisons('public');
+  const { data: metrics = [] } = useMetrics('public');
+
   const results = useMemo(() => {
     const q = normalize(query.trim());
     if (!q) return [];
@@ -83,10 +88,12 @@ export default function SearchPage() {
 
     const items: ResultItem[] = [];
 
-    for (const roadmap of seedRoadmaps) {
+    for (const roadmap of roadmaps) {
       const title = localize(roadmap.title, lang);
       const desc = localize(roadmap.description, lang);
-      const topics = roadmap.topics.map((topic) => localize(topic, lang));
+      const topics = (roadmap.topics || []).map((topic) =>
+        typeof topic === 'string' ? topic : localize(topic, lang),
+      );
       if (match(title, desc, ...topics)) {
         items.push({
           id: `roadmap-${roadmap.id}`,
@@ -96,7 +103,7 @@ export default function SearchPage() {
           href: `/roadmaps/${roadmap.id}`,
         });
       }
-      for (const step of roadmap.steps) {
+      for (const step of roadmap.steps || []) {
         const stepTitle = localize(step.title, lang);
         const stepDesc = localize(step.description, lang);
         const stepNote = localize(step.note, lang);
@@ -112,7 +119,7 @@ export default function SearchPage() {
       }
     }
 
-    for (const tech of seedTechProfiles) {
+    for (const tech of techProfiles) {
       const name = localize(tech.name, lang);
       const summary = localize(tech.summary, lang);
       const details = [...tech.strengths, ...tech.limitations, ...tech.friction].map((item) =>
@@ -129,9 +136,9 @@ export default function SearchPage() {
       }
     }
 
-    for (const comp of seedComparisons) {
+    for (const comp of comparisons) {
       const title = localize(comp.title, lang);
-      const criteria = comp.criteria.map((criterion) => localize(criterion.name, lang));
+      const criteria = (comp.criteria || []).map((criterion) => localize(criterion.name, lang));
       if (match(title, ...criteria)) {
         items.push({
           id: `comparison-${comp.id}`,
@@ -142,7 +149,7 @@ export default function SearchPage() {
       }
     }
 
-    for (const metric of seedMetrics) {
+    for (const metric of metrics) {
       const label = localize(metric.axis.label, lang);
       const finding = localize(metric.finding, lang);
       if (match(label, finding)) {
@@ -187,7 +194,7 @@ export default function SearchPage() {
     }
 
     return filter === 'all' ? items : items.filter((item) => item.type === filter);
-  }, [decisions, filter, lang, notes, query]);
+  }, [comparisons, decisions, filter, lang, metrics, notes, query, roadmaps]);
 
   return (
     <div className="page-enter space-y-6">
@@ -204,6 +211,7 @@ export default function SearchPage() {
             aria-hidden="true"
           />
           <input
+            name="search-query"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className={`${INPUT_CLASS} ps-11`}

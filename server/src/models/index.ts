@@ -27,6 +27,7 @@ export const UserModel = model(
       email: { type: String, required: true, unique: true, lowercase: true, trim: true },
       passwordHash: { type: String, required: true },
       displayName: { type: String, trim: true, default: undefined },
+      sessionVersion: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
   ),
@@ -44,8 +45,23 @@ export const RoadmapModel = model(
       parentId: { type: Schema.Types.ObjectId, default: null, index: true },
       techId: { type: String, default: null, trim: true },
       order: { type: Number, required: true, default: 0 },
+      legacyKey: { type: String, trim: true, default: undefined },
+      prerequisites: { type: [String], default: [] },
+      topics: { type: [String], default: [] },
+      paused: { type: Boolean, default: false },
+      status: {
+        type: String,
+        enum: ['planned', 'in_progress', 'finished', 'paused'],
+        default: undefined,
+      },
+      icon: { type: String, trim: true, default: undefined },
+      image: { type: String, trim: true, default: undefined },
+      revision: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
+  ).index(
+    { ownerId: 1, legacyKey: 1 },
+    { unique: true, partialFilterExpression: { legacyKey: { $type: 'string' } } },
   ),
 );
 
@@ -59,9 +75,18 @@ export const StepModel = model(
       description: { type: localizedStringSchema, default: undefined },
       resources: { type: [linkSchema], default: [] },
       order: { type: Number, required: true, default: 0 },
+      legacyKey: { type: String, trim: true, default: undefined },
       stage: { type: String, enum: PIPELINE_STAGES, default: null },
+      note: { type: localizedStringSchema, default: undefined },
+      done: { type: Boolean, default: undefined },
+      revision: { type: Number, required: true, default: 0 },
+      linkedRoadmapId: { type: Schema.Types.ObjectId, default: null },
+      linkedStepId: { type: Schema.Types.ObjectId, default: null },
     },
     { timestamps: true },
+  ).index(
+    { ownerId: 1, legacyKey: 1 },
+    { unique: true, partialFilterExpression: { legacyKey: { $type: 'string' } } },
   ),
 );
 
@@ -72,10 +97,16 @@ export const ProgressModel = model(
       ownerId: ownerIdField,
       stepId: { type: Schema.Types.ObjectId, required: true, index: true },
       done: { type: Boolean, required: true, default: false },
+      status: {
+        type: String,
+        enum: ['not_started', 'in_progress', 'partially_done', 'done', 'revisit', 'test', 'revise'],
+        default: undefined,
+      },
+      percent: { type: Number, min: 0, max: 100, default: undefined },
       completedAt: { type: Date, default: null },
     },
     { timestamps: true },
-  ),
+  ).index({ ownerId: 1, stepId: 1 }, { unique: true }),
 );
 
 const criterionScoreSchema = new Schema(
@@ -106,6 +137,10 @@ export const ComparisonModel = model(
       candidateTechIds: { type: [String], default: [] },
       criteria: { type: [criterionSchema], default: [] },
       conclusion: { type: localizedStringSchema, default: undefined },
+      chosenTechId: { type: String, default: null, trim: true },
+      revisitAt: { type: Date, default: null },
+      evidence: { type: [linkSchema], default: [] },
+      revision: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
   ),
@@ -134,6 +169,8 @@ export const MetricModel = model(
         default: [],
       },
       finding: { type: localizedStringSchema, required: true },
+      evidence: { type: [linkSchema], default: [] },
+      revision: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
   ),
@@ -151,6 +188,7 @@ export const NoteModel = model(
       content: { type: localizedStringSchema, required: true },
       tags: { type: [String], default: [] },
       references: { type: [String], default: [] },
+      revision: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
   ),
@@ -168,6 +206,7 @@ export const DecisionModel = model(
       consequences: { type: localizedStringSchema, required: true },
       revisitAt: { type: Date, default: null },
       links: { type: [linkSchema], default: [] },
+      revision: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
   ),
@@ -186,6 +225,35 @@ export const FocusModel = model(
         stepId: { type: Schema.Types.ObjectId, default: null },
         at: { type: Date, default: null },
       },
+      items: {
+        type: [
+          new Schema(
+            {
+              id: { type: String, required: true, trim: true },
+              kind: { type: String, enum: ['technology', 'project', 'milestone'], required: true },
+              targetId: { type: String, required: true, trim: true },
+              highlighted: { type: Boolean, required: true, default: false },
+            },
+            { _id: false },
+          ),
+        ],
+        default: [],
+      },
+      weeklyFocus: {
+        type: [
+          new Schema(
+            {
+              id: { type: String, required: true, trim: true },
+              title: { type: localizedStringSchema, required: true },
+              highlighted: { type: Boolean, required: true, default: false },
+            },
+            { _id: false },
+          ),
+        ],
+        default: [],
+      },
+      weeklyFocusConfigured: { type: Boolean, default: false },
+      revision: { type: Number, required: true, default: 0 },
     },
     { timestamps: true },
   ),

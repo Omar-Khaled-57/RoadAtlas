@@ -7,6 +7,8 @@ import { ProgressRing } from '../components/ProgressRing';
 import { KindBadge, StatusBadge } from '../components/RoadmapBadges';
 import { OwnerRoadmapDetail } from '../components/OwnerRoadmapDetail';
 import { RoadmapCard } from '../components/RoadmapCard';
+import { useSession } from '../data/queries';
+import { useRoadmapGraph } from '../data/roadmapGraph';
 import {
   childRoadmaps,
   getRoadmap,
@@ -25,14 +27,23 @@ export function RoadmapDetailPage() {
   const { t, i18n } = useTranslation();
   const { id } = useParams();
   const lang = i18n.language;
-  const roadmap = getRoadmap(id);
+  const { data: session } = useSession();
+  const authenticated = Boolean(session?.authenticated);
+  const { roadmaps, isLoading: graphLoading, isError: graphError } = useRoadmapGraph();
 
   // Roadmaps the API owns use Mongo ids; the catalogue below uses readable slugs.
-  if (!roadmap && id && /^[a-f\d]{24}$/i.test(id)) {
+  const roadmap = getRoadmap(roadmaps, id);
+  const isOwner = Boolean(
+    authenticated && roadmap?.ownerId && roadmap.ownerId === session?.user?.id,
+  );
+  // Owners get the editable detail view; visitors get the read-only public page.
+  // A Mongo id that the public graph cannot resolve (private or unpublished) also
+  // falls through to the owner view, which reports its own not-found state.
+  if (id && /^[a-f\d]{24}$/i.test(id) && (isOwner || !roadmap)) {
     return <OwnerRoadmapDetail id={id} />;
   }
 
-  if (!roadmap) {
+  if (graphError) {
     return (
       <div className="page-enter space-y-6">
         <BackLink />
@@ -49,12 +60,21 @@ export function RoadmapDetailPage() {
     );
   }
 
+  if (graphLoading || !roadmap) {
+    return (
+      <div className="page-enter space-y-6">
+        <BackLink />
+        <p className="text-sm text-fg-muted">{t('workspace.loading')}</p>
+      </div>
+    );
+  }
+
   const progress = roadmapProgress(roadmap);
   const status = roadmapStatus(roadmap);
   const tone = KIND_TONE[roadmap.kind];
   const Icon = KIND_ICON[roadmap.kind];
-  const parent = getRoadmap(roadmap.parentId);
-  const children = childRoadmaps(roadmap.id);
+  const parent = getRoadmap(roadmaps, roadmap.parentId);
+  const children = childRoadmaps(roadmaps, roadmap.id);
   const currentIndex = roadmap.steps.findIndex((step) => !step.done);
 
   return (
@@ -88,11 +108,13 @@ export function RoadmapDetailPage() {
               </p>
             ) : null}
           </div>
-          <ProgressRing
-            value={progress}
-            label={t('roadmaps.progressLabel')}
-            caption={t('roadmaps.progress', { value: progress })}
-          />
+          {authenticated && roadmap.steps.some((s) => 'done' in s) && (
+            <ProgressRing
+              value={progress}
+              label={t('roadmaps.progressLabel')}
+              caption={t('roadmaps.progress', { value: progress })}
+            />
+          )}
         </div>
       </header>
 
@@ -158,7 +180,7 @@ export function RoadmapDetailPage() {
                 step={step}
                 index={index}
                 total={roadmap.steps.length}
-                current={index === currentIndex}
+                current={authenticated && index === currentIndex}
                 lang={lang}
               />
             ))}

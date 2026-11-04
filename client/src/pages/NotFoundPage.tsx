@@ -26,7 +26,7 @@ export function NotFoundPage() {
 
   return (
     <div className="page-enter space-y-8">
-      <section className="surface-card p-8 text-center sm:p-12">
+      <section className="surface-card p-8 mt-10 text-center sm:p-12">
         <span className="icon-tile mx-auto bg-primary-soft text-primary">
           <Compass aria-hidden="true" />
         </span>

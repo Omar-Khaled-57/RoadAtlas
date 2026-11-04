@@ -14,9 +14,20 @@ stepsRouter.patch('/:id', requireAuth, async (req, res) => {
   const input = parseOrThrow(updateStepSchema, req.body);
   const ownerId = callerId(res);
 
+  if ('revision' in input && typeof input.revision === 'number') {
+    const existing = await StepModel.findOne({ _id: id, ownerId }).select('revision').lean();
+    if (existing && existing.revision !== input.revision) {
+      res.status(409).json({ message: 'Conflict: step was updated elsewhere.' });
+      return;
+    }
+  }
+
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
+  if ('revision' in changes && typeof changes.revision === 'number') {
+    changes.revision = (changes.revision ?? 0) + 1;
+  }
   const updated = await StepModel.findOneAndUpdate(
     { _id: id, ownerId },
     { $set: changes },
@@ -51,15 +62,23 @@ stepsRouter.get('/:id/progress', requireAuth, async (req, res) => {
 
 stepsRouter.put('/:id/progress', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const { done } = parseOrThrow(progressSchema, req.body);
+  const input = parseOrThrow(progressSchema, req.body);
   const ownerId = callerId(res);
 
   const step = await StepModel.findOne({ _id: id, ownerId }).lean();
   if (!step) throw notFound('Step not found.');
 
+  const done = input.done ?? input.status === 'done';
+  const update: Record<string, unknown> = {
+    done,
+    completedAt: done ? new Date() : null,
+  };
+  if (input.status !== undefined) update.status = input.status;
+  if (input.percent !== undefined) update.percent = input.percent;
+
   const progress = await ProgressModel.findOneAndUpdate(
     { ownerId, stepId: id },
-    { $set: { done, completedAt: done ? new Date() : null } },
+    { $set: update },
     { returnDocument: 'after', upsert: true, runValidators: true, setDefaultsOnInsert: true },
   ).lean();
 

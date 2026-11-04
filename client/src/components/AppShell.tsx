@@ -4,7 +4,6 @@ import {
   Check,
   FileText,
   GitCompareArrows,
-  LogIn,
   LogOut,
   Map,
   MapPinned,
@@ -13,7 +12,7 @@ import {
   Workflow,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, Outlet } from 'react-router-dom';
@@ -21,6 +20,8 @@ import type { AuthSession, HealthResponse } from '@shared/index';
 import { api } from '../lib/api';
 import { Background } from './Background';
 import { LanguageToggle } from './LanguageToggle';
+import { LoginDialog } from './LoginDialog';
+import { StarEasterEgg } from './StarEasterEgg';
 import { ThemeToggle } from './ThemeToggle';
 import { useDocumentDirection } from '../lib/i18nSync';
 
@@ -29,17 +30,33 @@ function HealthBadge() {
   const { data, isError } = useQuery({
     queryKey: ['health'],
     queryFn: async () => (await api.get<HealthResponse>('/api/health')).data,
-    retry: false,
     refetchInterval: 60_000,
   });
-  const ok = !isError && data?.status === 'ok';
+  // Distinguish "not fetched yet" from "down": the retry policy means the first
+  // result can arrive a few seconds late, and claiming "offline" would be a lie.
+  const state = isError
+    ? 'offline'
+    : data
+      ? data.status === 'ok'
+        ? 'online'
+        : 'offline'
+      : 'unknown';
+  const dotClass =
+    state === 'online' ? 'bg-success' : state === 'offline' ? 'bg-error' : 'bg-fg-muted';
+  const label =
+    state === 'online'
+      ? t('health.online')
+      : state === 'offline'
+        ? t('health.offline')
+        : t('common.loading');
   return (
     <span
       role="status"
+      aria-busy={state === 'unknown'}
       className="hidden h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-xs text-fg-muted sm:inline-flex"
     >
-      <span className={`h-2 w-2 rounded-full ${ok ? 'bg-success' : 'bg-error'}`} />
-      {ok ? t('health.online') : t('health.offline')}
+      <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+      {label}
     </span>
   );
 }
@@ -50,18 +67,30 @@ export function AppShell() {
   const queryClient = useQueryClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMounted, setMenuMounted] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const { data: session } = useQuery({
     queryKey: ['session'],
     queryFn: async () => (await api.get<AuthSession>('/api/auth/session')).data,
-    retry: false,
   });
   const logout = useMutation({
     mutationFn: async () => (await api.post<AuthSession>('/api/auth/logout')).data,
-    onSuccess: (nextSession) => queryClient.setQueryData(['session'], nextSession),
+    onMutate: () => {
+      // Hide owner controls as soon as logout is requested, even on a slow connection.
+      queryClient.setQueryData<AuthSession>(['session'], { authenticated: false, user: null });
+    },
+    onSuccess: (nextSession) => {
+      queryClient.clear();
+      queryClient.setQueryData(['session'], nextSession);
+    },
+    onError: () => {
+      // Restore the server's answer if the request failed before the cookie was revoked.
+      void queryClient.invalidateQueries({ queryKey: ['session'] });
+    },
   });
+  const closeLogin = useCallback(() => setLoginOpen(false), []);
   const nav = [
-    { to: '/roadmaps', label: t('nav.roadmaps'), icon: BookOpen },
     { to: '/map', label: t('nav.map'), icon: Map },
+    { to: '/roadmaps', label: t('nav.roadmaps'), icon: BookOpen },
     { to: '/compare', label: t('nav.compare'), icon: GitCompareArrows },
     { to: '/pipelines', label: t('nav.pipelines'), icon: Workflow },
     { to: '/knowledge', label: t('nav.knowledge'), icon: BookOpen },
@@ -97,9 +126,51 @@ export function AppShell() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+  useEffect(() => {
+    let buffer = '';
+    function fun(event: KeyboardEvent) {
+      if (event.isComposing || event.repeat) {
+        buffer = '';
+        return;
+      }
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        buffer = '';
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+          Boolean(target.closest('[contenteditable="true"]')))
+      ) {
+        buffer = '';
+        return;
+      }
+      if (!/^[a-z]$/i.test(event.key)) {
+        buffer = '';
+        return;
+      }
+      buffer = `${buffer}${event.key.toUpperCase()}`.slice(-3);
+      if (buffer === 'OMR') {
+        buffer = '';
+        event.preventDefault();
+        setMenuOpen(false);
+        setLoginOpen(true);
+      }
+    }
+    window.addEventListener('keydown', fun);
+    return () => window.removeEventListener('keydown', fun);
+  }, []);
 
   return (
     <div className="relative min-h-screen text-fg-primary">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[100] focus:inline-flex focus:rounded-lg focus:border focus:border-border-strong focus:bg-surface-solid focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-fg-primary focus:shadow-lg"
+      >
+        {t('common.skipToContent')}
+      </a>
       <Background />
       <header className="sticky top-0 z-50 border-b border-border-subtle bg-bg-base/90 shadow-sm shadow-fg-primary/5 backdrop-blur-2xl">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-3 px-5 py-3 sm:px-8 sm:py-3.5 xl:flex-nowrap">
@@ -134,7 +205,7 @@ export function AppShell() {
           </nav>
           <div className="ms-auto flex shrink-0 items-center gap-1.5 xl:gap-2">
             <HealthBadge />
-            {session?.authenticated ? (
+            {session?.authenticated && (
               <button
                 type="button"
                 onClick={() => logout.mutate()}
@@ -145,15 +216,6 @@ export function AppShell() {
                 <LogOut className="h-4 w-4" />
                 <span className="hidden text-xs font-medium md:inline">{t('nav.logout')}</span>
               </button>
-            ) : (
-              <Link
-                to="/login"
-                onClick={closeMenu}
-                className="hidden h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover sm:inline-flex"
-              >
-                <LogIn className="h-4 w-4" />
-                <span className="hidden text-xs font-medium md:inline">{t('nav.login')}</span>
-              </Link>
             )}
             <span className="hidden sm:inline-flex">
               <LanguageToggle />
@@ -191,8 +253,12 @@ export function AppShell() {
                 <div className="mx-auto flex h-full flex-col px-5 pb-6 pt-2 sm:px-6">
                   <div className="mb-6 flex items-center justify-between border-b border-border-subtle pb-4">
                     <div className="flex items-center gap-3">
-                      <span className="brand-mark h-10 w-10"><MapPinned className="h-5 w-5" /></span>
-                      <span className="text-base font-bold tracking-tight text-fg-primary">{t('app.name')}</span>
+                      <span className="brand-mark h-10 w-10">
+                        <MapPinned className="h-5 w-5" />
+                      </span>
+                      <span className="text-base font-bold tracking-tight text-fg-primary">
+                        {t('app.name')}
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -204,24 +270,28 @@ export function AppShell() {
                     </button>
                   </div>
                   <div className="mobile-nav-links flex flex-col gap-2">
-                  {nav.map(({ to, label, icon: Icon }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      onClick={closeMenu}
-                      className={({ isActive }) => `mobile-nav-link flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm font-medium transition ${isActive ? 'is-active' : ''}`}
-                    >
-                      <span className="mobile-nav-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-primary"><Icon className="h-[18px] w-[18px]" /></span>
-                      <span className="flex-1">{label}</span>
-                      <span className="mobile-nav-indicator h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-opacity" />
-                    </NavLink>
-                  ))}
+                    {nav.map(({ to, label, icon: Icon }) => (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        onClick={closeMenu}
+                        className={({ isActive }) =>
+                          `mobile-nav-link flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm font-medium transition ${isActive ? 'is-active' : ''}`
+                        }
+                      >
+                        <span className="mobile-nav-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-primary">
+                          <Icon className="h-[18px] w-[18px]" />
+                        </span>
+                        <span className="flex-1">{label}</span>
+                        <span className="mobile-nav-indicator h-1.5 w-1.5 rounded-full bg-primary opacity-0 transition-opacity" />
+                      </NavLink>
+                    ))}
                   </div>
                   <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
                     <span className="inline-flex">
                       <LanguageToggle />
                     </span>
-                    {session?.authenticated ? (
+                    {session?.authenticated && (
                       <button
                         type="button"
                         onClick={() => {
@@ -234,15 +304,6 @@ export function AppShell() {
                         <LogOut className="h-4 w-4" />
                         <span className="text-xs font-medium">{t('nav.logout')}</span>
                       </button>
-                    ) : (
-                      <Link
-                        to="/login"
-                        onClick={closeMenu}
-                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-border-strong bg-surface px-3 text-fg-primary transition hover:bg-surface-hover"
-                      >
-                        <LogIn className="h-4 w-4" />
-                        <span className="text-xs font-medium">{t('nav.login')}</span>
-                      </Link>
                     )}
                   </div>
                 </div>
@@ -253,10 +314,12 @@ export function AppShell() {
       </header>
       <main
         id="main-content"
+        tabIndex={-1}
         className="relative z-10 mx-auto max-w-7xl space-y-7 px-5 pt-6 sm:px-8"
       >
         <Outlet />
       </main>
+      <LoginDialog open={loginOpen} onClose={closeLogin} />
       <footer className="relative mx-auto mt-7 max-w-7xl px-5 pb-16 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-surface px-4 py-3 text-xs text-fg-muted">
           <span>
@@ -266,6 +329,7 @@ export function AppShell() {
             <Check className="h-3.5 w-3.5 text-success" />
             {t('footer.note')}
           </span>
+          <StarEasterEgg onTripleClick={() => setLoginOpen(true)} />
         </div>
       </footer>
     </div>

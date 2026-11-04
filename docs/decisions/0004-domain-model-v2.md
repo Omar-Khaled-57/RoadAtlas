@@ -71,9 +71,15 @@ content: LocalizedString, tags: string[], references: string[], createdAt, updat
 attachment to any entity via `targetType`/`targetId` (roadmap/step/tech/decision); `ownerId` is the
 owning user (distinct from the target).
 
-**Focus (new).** `Focus(ownerId, visibility, currentTechId?, currentProjectId?, lastVisited?, updatedAt)`
-— one per owner. `currentProjectId` is a pipeline `Roadmap`; `lastVisited = { roadmapId, stepId, at }`.
-Powers the Home hero and _continue where you left off_.
+**Focus (new).** One `Focus` per owner stores Home selections and visit history. In addition to the
+original `currentTechId?` / `currentProjectId?` compatibility fields, `items[]` contains ordered
+`FocusItem = { id, kind: 'technology' | 'project' | 'milestone', targetId, highlighted }` references.
+Technology rows point to a tech `Roadmap`, project rows to a pipeline `Roadmap`, and milestone rows
+to a `Step` within a pipeline. Names, links, and owner progress are derived from those records. One
+or two rows are highlighted whenever focus rows exist. `weeklyFocus[] = { id, title: LocalizedString,
+highlighted }` stores editable home focus columns, with one or two highlighted columns when any
+columns exist. `lastVisited = { roadmapId, stepId, at }` powers _continue where you left off_; it is
+separate from the editable focus rows and columns.
 
 **DecisionRecord (new).** `DecisionRecord(ownerId, visibility, context, alternatives[], decision,
 consequences, revisitAt, links[], createdAt, updatedAt)` — backs the reserved `/decisions` page

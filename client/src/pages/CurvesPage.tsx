@@ -3,41 +3,45 @@ import { useTranslation } from 'react-i18next';
 import { usePageMeta } from '../lib/seo';
 
 import { ExternalLink, Sparkles } from 'lucide-react';
-import { evidenceLinks, seedMetrics, seedTechCurves, type TechCurve } from '../data/curves';
 import type { ID, LocalizedString } from '@shared/index';
-
-const toneStroke: Record<TechCurve['tone'], string> = {
-  primary: 'var(--color-primary)',
-  secondary: 'var(--color-secondary)',
-  accent: 'var(--color-accent)',
-  surface: 'var(--color-border-strong)',
-};
+import { useMetrics, useSession } from '../data/queries';
+import { localize } from '../lib/localize';
+import { techProfiles, type TechProfile } from '../data/techCatalogue';
 
 export default function CurvesPage() {
-  usePageMeta({ titleKey: 'seo.curves.title', descriptionKey: 'seo.curves.description' });
+  usePageMeta({
+    titleKey: 'seo.curves.title',
+    descriptionKey: 'seo.curves.description',
+  });
   const { t, i18n } = useTranslation();
-  const isAr = i18n.language === 'ar';
+  const lang = i18n.language;
+  const isAr = lang === 'ar';
   const dir = isAr ? 'rtl' : 'ltr';
+  const { data: session } = useSession();
+  const authenticated = Boolean(session?.authenticated);
+  const metricsQuery = useMetrics(authenticated ? 'owner' : 'public');
+  const metrics = useMemo(() => metricsQuery.data ?? [], [metricsQuery.data]);
 
   const availableMetrics = useMemo(() => {
     const seen = new Set<string>();
     const list: { key: string; label: LocalizedString }[] = [];
-    for (const metric of seedMetrics) {
+    for (const metric of metrics) {
       if (seen.has(metric.key)) continue;
       seen.add(metric.key);
       list.push({ key: metric.key, label: metric.axis.label });
     }
     return list;
-  }, []);
+  }, [metrics]);
 
-  const [activeMetric, setActiveMetric] = useState<ID>(() => availableMetrics[0]?.key ?? '');
+  const [selectedMetric, setSelectedMetric] = useState<ID>('');
+  const activeMetric = selectedMetric || availableMetrics[0]?.key || '';
 
-  const techs = seedTechCurves;
+  const techs = techProfiles;
   const techById = useMemo(() => new Map(techs.map((t) => [t.id, t])), [techs]);
 
   const series = useMemo(() => {
-    const metrics = seedMetrics.filter((m) => m.key === activeMetric);
-    return metrics.map((m) => ({
+    const active = metrics.filter((m) => m.key === activeMetric);
+    return active.map((m) => ({
       metric: m,
       tech: techById.get(m.techId),
       data: m.points
@@ -45,7 +49,34 @@ export default function CurvesPage() {
         .sort((a, b) => a.x - b.x)
         .map((p) => ({ x: p.x, y: p.y })),
     }));
-  }, [activeMetric, techById]);
+  }, [activeMetric, metrics, techById]);
+
+  // Gather unique evidence links from all metrics for the evidence section.
+  const evidenceLinks = useMemo(() => {
+    const seen = new Set<string>();
+    const links: { url: string; label: LocalizedString }[] = [];
+    for (const metric of metrics) {
+      for (const link of metric.evidence ?? []) {
+        if (seen.has(link.url)) continue;
+        seen.add(link.url);
+        links.push({ url: link.url, label: { en: link.label } });
+      }
+    }
+    return links;
+  }, [metrics]);
+
+  const toneColor = (tone: TechProfile['tone']): string => {
+    switch (tone) {
+      case 'primary':
+        return 'var(--primary)';
+      case 'secondary':
+        return 'var(--secondary)';
+      case 'accent':
+        return 'var(--accent)';
+      case 'surface':
+        return 'var(--border-strong)';
+    }
+  };
 
   return (
     <div className="page-enter space-y-6" dir={dir} lang={isAr ? 'ar' : 'en'}>
@@ -69,9 +100,9 @@ export default function CurvesPage() {
                 type="button"
                 className={`filter-chip ${activeMetric === key ? 'is-active' : ''}`}
                 aria-pressed={activeMetric === key}
-                onClick={() => setActiveMetric(key)}
+                onClick={() => setSelectedMetric(key)}
               >
-                {label[isAr ? 'ar' : 'en']}
+                {localize(label, lang)}
               </button>
             ))}
           </div>
@@ -95,7 +126,7 @@ export default function CurvesPage() {
                       x2="90%"
                       y1={`${10 + i * 20}%`}
                       y2={`${10 + i * 20}%`}
-                      stroke="var(--color-border-subtle)"
+                      stroke="var(--border-subtle)"
                       strokeDasharray="3 3"
                     />
                   ))}
@@ -112,7 +143,7 @@ export default function CurvesPage() {
                         key={s.metric.id}
                         d={path}
                         fill="none"
-                        stroke={s.tech ? toneStroke[s.tech.tone] : 'var(--color-primary)'}
+                        stroke={s.tech ? toneColor(s.tech.tone) : 'var(--primary)'}
                         strokeWidth={2}
                         vectorEffect="non-scaling-stroke"
                       />
@@ -128,7 +159,7 @@ export default function CurvesPage() {
                       className="primary-button"
                       onClick={() => {
                         const first = availableMetrics[0];
-                        if (first) setActiveMetric(first.key);
+                        if (first) setSelectedMetric(first.key);
                       }}
                     >
                       {t('curves.cta')}
@@ -151,23 +182,23 @@ export default function CurvesPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">
                     <p className="text-sm font-medium">
-                      {s.tech?.name[isAr ? 'ar' : 'en'] ?? s.metric.techId}
+                      {s.tech ? localize(s.tech.name, lang) : s.metric.techId}
                     </p>
                     <p className="text-xs text-fg-muted">
-                      {s.metric.axis.label[isAr ? 'ar' : 'en']}
+                      {localize(s.metric.axis.label, lang)}
                       {s.metric.axis.unit ? ` · ${s.metric.axis.unit}` : ''}
                     </p>
                   </div>
                   <span
                     className="h-2.5 w-2.5 rounded-full"
                     style={{
-                      background: s.tech ? toneStroke[s.tech.tone] : 'var(--color-primary)',
+                      background: s.tech ? toneColor(s.tech.tone) : 'var(--primary)',
                     }}
                     aria-hidden="true"
                   />
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-fg-muted">
-                  {s.metric.finding[isAr ? 'ar' : 'en']}
+                  {localize(s.metric.finding, lang)}
                 </p>
               </article>
             ))}
@@ -188,36 +219,36 @@ export default function CurvesPage() {
             >
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ background: toneStroke[tech.tone] }}
+                style={{ background: toneColor(tech.tone) }}
                 aria-hidden="true"
               />
-              <span>{tech.name[isAr ? 'ar' : 'en']}</span>
+              <span>{localize(tech.name, lang)}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="surface-card space-y-3 p-5 sm:p-6">
-        <h2 className="text-lg font-semibold">{t('curves.evidence')}</h2>
-        <ul className="space-y-2">
-          {evidenceLinks.map((link) => (
-            <li key={link.url}>
-              <a
-                href={link.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1.5 text-sm text-primary transition hover:underline"
-              >
-                {link.label[isAr ? 'ar' : 'en']}
-                <ExternalLink className="h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />
-                <span className="sr-only">
-                  {isAr ? '(يفتح في تبويب جديد)' : '(opens in new tab)'}
-                </span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {evidenceLinks.length > 0 ? (
+        <section className="surface-card space-y-3 p-5 sm:p-6">
+          <h2 className="text-lg font-semibold">{t('curves.evidence')}</h2>
+          <ul className="space-y-2">
+            {evidenceLinks.map((link) => (
+              <li key={link.url}>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-1.5 text-sm text-primary transition hover:underline"
+                >
+                  {localize(link.label, lang)}
+                  <ExternalLink className="h-4 w-4 rtl:-scale-x-100" aria-hidden="true" />
+                  <span className="sr-only">{t('common.opensInNewTab')}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

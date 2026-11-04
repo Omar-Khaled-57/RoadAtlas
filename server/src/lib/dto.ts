@@ -9,6 +9,7 @@ import type {
   Note,
   Roadmap,
   RoadmapKind,
+  RoadmapStatus,
   Step,
   Visibility,
 } from '@shared/index';
@@ -19,6 +20,11 @@ type Raw = Record<string, unknown>;
 export function toId(value: unknown): string | undefined {
   if (value === null || value === undefined) return undefined;
   return String(value);
+}
+
+export function redactPublic<T extends Record<string, unknown>>(input: T): Omit<T, 'ownerId'> {
+  const { ownerId: _ownerId, ...rest } = input as Record<string, unknown>;
+  return rest as Omit<T, 'ownerId'>;
 }
 
 function toIso(value: unknown): string {
@@ -71,6 +77,9 @@ function toScores(value: unknown): Record<string, { value: number; note?: Locali
 
 export function toRoadmapDto(input: unknown): Roadmap {
   const raw = (input ?? {}) as Raw;
+  const status = typeof raw.status === 'string' ? (raw.status as RoadmapStatus) : undefined;
+  const icon = typeof raw.icon === 'string' && raw.icon ? raw.icon : undefined;
+  const image = typeof raw.image === 'string' && raw.image ? raw.image : undefined;
   return {
     id: toId(raw._id) ?? '',
     ownerId: toId(raw.ownerId) ?? '',
@@ -81,6 +90,13 @@ export function toRoadmapDto(input: unknown): Roadmap {
     parentId: toId(raw.parentId),
     techId: typeof raw.techId === 'string' && raw.techId ? raw.techId : undefined,
     order: Number(raw.order ?? 0),
+    prerequisites: toStrings(raw.prerequisites),
+    topics: toStrings(raw.topics),
+    paused: Boolean(raw.paused),
+    status,
+    icon,
+    image,
+    revision: Number(raw.revision ?? 0),
     createdAt: toIso(raw.createdAt),
     updatedAt: toIso(raw.updatedAt),
   };
@@ -97,6 +113,9 @@ export function toStepDto(input: unknown): Step {
     resources: toLinks(raw.resources),
     order: Number(raw.order ?? 0),
     stage: (raw.stage ?? undefined) as Step['stage'],
+    note: toLocalized(raw.note),
+    done: typeof raw.done === 'boolean' ? raw.done : undefined,
+    revision: Number(raw.revision ?? 0),
     createdAt: toIso(raw.createdAt),
     updatedAt: toIso(raw.updatedAt),
   };
@@ -140,6 +159,7 @@ export function toComparisonDto(input: unknown): Comparison {
       ];
     },
   );
+  const revisitAt = raw.revisitAt ? toIso(raw.revisitAt) : undefined;
 
   return {
     id: toId(raw._id) ?? '',
@@ -149,6 +169,11 @@ export function toComparisonDto(input: unknown): Comparison {
     candidateTechIds: toStrings(raw.candidateTechIds),
     criteria,
     conclusion: toLocalized(raw.conclusion),
+    chosenTechId:
+      typeof raw.chosenTechId === 'string' && raw.chosenTechId ? raw.chosenTechId : null,
+    revisitAt,
+    evidence: toLinks(raw.evidence),
+    revision: Number(raw.revision ?? 0),
     createdAt: toIso(raw.createdAt),
     updatedAt: toIso(raw.updatedAt),
   };
@@ -180,6 +205,8 @@ export function toMetricDto(input: unknown): Metric {
     },
     points,
     finding: toLocalized(raw.finding) ?? { en: '' },
+    evidence: toLinks(raw.evidence),
+    revision: Number(raw.revision ?? 0),
     createdAt: toIso(raw.createdAt),
     updatedAt: toIso(raw.updatedAt),
   };
@@ -197,6 +224,7 @@ export function toNoteDto(input: unknown): Note {
     content: toLocalized(raw.content) ?? { en: '' },
     tags: toStrings(raw.tags),
     references: toStrings(raw.references),
+    revision: Number(raw.revision ?? 0),
     createdAt: toIso(raw.createdAt),
     updatedAt: toIso(raw.updatedAt),
   };
@@ -217,6 +245,7 @@ export function toDecisionDto(input: unknown): DecisionRecord {
     consequences: toLocalized(raw.consequences) ?? { en: '' },
     revisitAt,
     links: toLinks(raw.links),
+    revision: Number(raw.revision ?? 0),
     createdAt: toIso(raw.createdAt),
     updatedAt: toIso(raw.updatedAt),
   };
@@ -236,6 +265,40 @@ export function toFocusDto(input: unknown): Focus {
       typeof raw.currentTechId === 'string' && raw.currentTechId ? raw.currentTechId : undefined,
     currentProjectId: toId(raw.currentProjectId),
     lastVisited: roadmapId && at ? { roadmapId, stepId, at } : undefined,
+    items: Array.isArray(raw.items)
+      ? raw.items.flatMap((entry) => {
+          if (!entry || typeof entry !== 'object') return [];
+          const item = entry as Raw;
+          if (
+            typeof item.id !== 'string' ||
+            !['technology', 'project', 'milestone'].includes(String(item.kind)) ||
+            typeof item.targetId !== 'string'
+          ) {
+            return [];
+          }
+          return [
+            {
+              id: item.id,
+              kind: item.kind as 'technology' | 'project' | 'milestone',
+              targetId: item.targetId,
+              highlighted: Boolean(item.highlighted),
+            },
+          ];
+        })
+      : [],
+    ...(Array.isArray(raw.weeklyFocus) &&
+    (raw.weeklyFocusConfigured === true || raw.weeklyFocus.length > 0)
+      ? {
+          weeklyFocus: raw.weeklyFocus.flatMap((entry) => {
+            if (!entry || typeof entry !== 'object') return [];
+            const item = entry as Raw;
+            const id = typeof item.id === 'string' ? item.id : '';
+            const title = toLocalized(item.title);
+            return id && title ? [{ id, title, highlighted: Boolean(item.highlighted) }] : [];
+          }),
+        }
+      : {}),
+    revision: Number(raw.revision ?? 0),
     updatedAt: toIso(raw.updatedAt),
   };
 }

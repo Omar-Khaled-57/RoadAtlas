@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LoaderCircle, Plus, Trash2 } from 'lucide-react';
+import { LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { KindBadge } from './RoadmapBadges';
@@ -9,17 +9,21 @@ import {
   useDeleteRoadmap,
   useOwnerRoadmaps,
   useSession,
+  useUpdateRoadmap,
   type RoadmapDraft,
 } from '../data/queries';
 import { formatDate } from '../lib/format';
 import { localize } from '../lib/localize';
+import { techProfiles } from '../data/techCatalogue';
 
 const EMPTY_DRAFT: RoadmapDraft = {
   title: '',
   titleAr: '',
   description: '',
+  topics: '',
   kind: 'tech',
   visibility: 'private',
+  techId: '',
 };
 
 const INPUT_CLASS =
@@ -37,11 +41,39 @@ export function OwnerRoadmaps() {
 
   const roadmaps = useOwnerRoadmaps(authenticated);
   const create = useCreateRoadmap();
+  const update = useUpdateRoadmap();
   const remove = useDeleteRoadmap();
 
   const [formOpen, setFormOpen] = useState(false);
   const [draft, setDraft] = useState<RoadmapDraft>(EMPTY_DRAFT);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  function resetForm() {
+    setDraft(EMPTY_DRAFT);
+    setEditingId(null);
+    setFormOpen(false);
+  }
+
+  function startEdit(roadmap: (typeof items)[number]) {
+    setDraft({
+      title: roadmap.title.en,
+      titleAr: roadmap.title.ar ?? '',
+      description: roadmap.description?.en ?? '',
+      topics: (roadmap.topics ?? [])
+        .map((t) => {
+          if (typeof t === 'string') return t;
+          const loc = t as { en?: string; ar?: string };
+          return loc.en ?? loc.ar ?? '';
+        })
+        .join(', '),
+      kind: roadmap.kind,
+      visibility: roadmap.visibility,
+      techId: roadmap.techId ?? '',
+    });
+    setEditingId(roadmap.id);
+    setFormOpen(true);
+  }
 
   if (!authenticated) return null;
 
@@ -49,12 +81,26 @@ export function OwnerRoadmaps() {
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    create.mutate(toRoadmapInput(draft), {
-      onSuccess: () => {
-        setDraft(EMPTY_DRAFT);
-        setFormOpen(false);
-      },
-    });
+    if (editingId) {
+      const input = {
+        title: draft.titleAr.trim()
+          ? { en: draft.title.trim(), ar: draft.titleAr.trim() }
+          : { en: draft.title.trim() },
+        description: draft.description.trim() ? { en: draft.description.trim() } : null,
+        kind: draft.kind,
+        visibility: draft.visibility,
+        ...(draft.kind === 'tech' && draft.techId ? { techId: draft.techId } : {}),
+        topics: draft.topics
+          .split(',')
+          .map((topic) => topic.trim())
+          .filter(Boolean),
+      };
+      update.mutate({ id: editingId, input }, { onSuccess: resetForm });
+    } else {
+      create.mutate(toRoadmapInput(draft), {
+        onSuccess: resetForm,
+      });
+    }
   }
 
   return (
@@ -66,15 +112,27 @@ export function OwnerRoadmaps() {
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-fg-muted">{t('workspace.subtitle')}</p>
         </div>
-        <button
-          type="button"
-          className="secondary-button"
-          aria-expanded={formOpen}
-          onClick={() => setFormOpen((open) => !open)}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {t('workspace.new')}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="secondary-button"
+            aria-expanded={formOpen}
+            onClick={() => {
+              if (formOpen && editingId) {
+                resetForm();
+              } else if (formOpen) {
+                resetForm();
+              } else {
+                setDraft(EMPTY_DRAFT);
+                setEditingId(null);
+                setFormOpen(true);
+              }
+            }}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t('workspace.new')}
+          </button>
+        </div>
       </div>
 
       {formOpen ? (
@@ -124,6 +182,20 @@ export function OwnerRoadmaps() {
             />
           </div>
 
+          <div className="grid gap-2">
+            <label htmlFor="owner-topics" className="text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.topics')}
+            </label>
+            <input
+              id="owner-topics"
+              name="topics"
+              value={draft.topics}
+              onChange={(event) => setDraft({ ...draft, topics: event.target.value })}
+              className={INPUT_CLASS}
+              placeholder={t('workspace.form.topicsHint')}
+            />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <label htmlFor="owner-kind" className="text-sm font-semibold text-fg-secondary">
@@ -166,24 +238,50 @@ export function OwnerRoadmaps() {
             </div>
           </div>
 
-          {create.isError ? (
+          {draft.kind === 'tech' ? (
+            <div className="grid gap-2">
+              <label htmlFor="owner-tech" className="text-sm font-semibold text-fg-secondary">
+                {t('workspace.form.tech')}
+              </label>
+              <select
+                id="owner-tech"
+                name="techId"
+                value={draft.techId}
+                onChange={(event) => setDraft({ ...draft, techId: event.target.value })}
+                className={INPUT_CLASS}
+              >
+                <option value="">{t('workspace.form.techNone')}</option>
+                {techProfiles.map((tech) => (
+                  <option key={tech.id} value={tech.id}>
+                    {localize(tech.name, lang)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          {create.isError || update.isError ? (
             <p role="alert" className="text-sm text-error">
-              {t('workspace.createError')}
+              {editingId
+                ? t('workspace.updateError') || t('workspace.createError')
+                : t('workspace.createError')}
             </p>
           ) : null}
 
           <div className="flex flex-wrap gap-3">
             <button
               type="submit"
-              disabled={create.isPending || !draft.title.trim()}
+              disabled={create.isPending || update.isPending || !draft.title.trim()}
               className="primary-button min-h-11 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {create.isPending ? (
+              {create.isPending || update.isPending ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : null}
-              {create.isPending ? t('workspace.form.creating') : t('workspace.form.create')}
+              {create.isPending || update.isPending
+                ? t('workspace.form.creating')
+                : t(editingId ? 'common.save' : 'workspace.form.create')}
             </button>
-            <button type="button" className="secondary-button" onClick={() => setFormOpen(false)}>
+            <button type="button" className="secondary-button" onClick={resetForm}>
               {t('workspace.form.cancel')}
             </button>
           </div>
@@ -230,11 +328,20 @@ export function OwnerRoadmaps() {
                 <Link to={`/roadmaps/${roadmap.id}`} className="secondary-button">
                   {t('workspace.open')}
                 </Link>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => startEdit(roadmap)}
+                >
+                  <Pencil className="h-4 w-4" aria-hidden="true" />
+                  {t('common.edit')}
+                </button>
                 {confirmingId === roadmap.id ? (
                   <>
                     <button
                       type="button"
                       className="secondary-button"
+                      disabled={remove.isPending}
                       onClick={() => {
                         remove.mutate(roadmap.id);
                         setConfirmingId(null);

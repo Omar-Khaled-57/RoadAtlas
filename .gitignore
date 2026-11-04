@@ -27,3 +27,8 @@ desktop.ini
 
 # database backups (any workspace)
 backups/
+.vercel
+.env*
+
+# generated serverless bundle
+api/_server.cjs

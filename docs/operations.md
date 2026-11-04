@@ -8,27 +8,32 @@ How RoadAtlas is configured, observed, backed up and recovered. Code-level conve
 The server reads `server/.env` in development (copy `server/.env.example`) and process environment
 variables in production. Invalid values fail fast at boot (zod schema in `server/src/config/env.ts`).
 
-| Variable              | Required                               | Notes                                           |
-| --------------------- | -------------------------------------- | ----------------------------------------------- |
-| `NODE_ENV`            | no (`development`)                     | `production` tightens cookies, CORS and errors  |
-| `PORT`                | no (`4000`)                            |                                                 |
-| `CLIENT_ORIGIN`       | **yes in production**                  | Exact origin allowed by CORS and the CSRF guard |
-| `MONGODB_URI`         | unless an env admin is set             | Without it every data route answers 503         |
-| `JWT_SECRET`          | **yes in production** (32+ characters) | Rotating it signs everybody out                 |
-| `ADMIN_EMAIL`         | required only without a database       | Bootstrap account; also provisioned into the DB |
-| `ADMIN_PASSWORD_HASH` | same as `ADMIN_EMAIL`                  | bcrypt hash, never the plaintext                |
-| `LOG_LEVEL`           | no (`debug` dev, `info` prod)          | `debug`, `info`, `warn`, `error`                |
+| Variable              | Required                               | Notes                                                           |
+| --------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV`            | no (`development`)                     | `production` tightens cookies, CORS and errors                  |
+| `PORT`                | no (`4000`)                            |                                                                 |
+| `CLIENT_ORIGIN`       | **yes in production**                  | Exact origin allowed by CORS and the CSRF guard                 |
+| `MONGODB_URI`         | **yes in production**                  | Without it data routes answer 503 and health reports `disabled` |
+| `JWT_SECRET`          | **yes in production** (32+ characters) | Rotating it signs everybody out                                 |
+| `ADMIN_EMAIL`         | no                                     | Optional bootstrap account; also provisioned into the DB        |
+| `ADMIN_PASSWORD_HASH` | same as `ADMIN_EMAIL`                  | bcrypt hash, never the plaintext                                |
+| `LOG_LEVEL`           | no (`debug` dev, `info` prod)          | `debug`, `info`, `warn`, `error`                                |
 
-`ADMIN_EMAIL`/`ADMIN_PASSWORD_HASH` must be set together. With a database, additional users are
-created with the provisioning script instead:
+`ADMIN_EMAIL`/`ADMIN_PASSWORD_HASH` must be set together. That pair is only needed when the database
+has no user yet and you want an account without the provisioning script; with a database, the owner is
+created with the script instead:
 
 ```bash
 USER_PASSWORD='choose-a-long-password' npm run user:create -w server -- --email owner@example.com
-# or: npm run user:create -w server -- --email owner@example.com --password '...'
 ```
 
-There is no interactive prompt. Prefer `USER_PASSWORD`: a `--password` value is visible to other
-users through the process list. Passwords must be at least 12 characters; duplicates are refused.
+There is no `--password` flag (command-line arguments leak through the process list); in an
+interactive terminal the script prompts with hidden input. RoadAtlas supports exactly one account, and
+the script refuses to create a second one.
+
+A missing `MONGODB_URI` is never fatal: the API still boots, `GET /api/health` reports
+`database: "disabled"` and data routes answer 503. That keeps a misconfigured deployment diagnosable
+instead of turning every request into a bare function error.
 
 ## Logging and health
 
@@ -71,6 +76,67 @@ restored-so-far state.
 `backups/` is git-ignored. Dumps contain password hashes and personal data: encrypt them at rest,
 restrict access, and never commit them. For managed MongoDB (Atlas) prefer its native snapshots as
 the primary mechanism and use these scripts for local/staging copies or migrations.
+
+## Vercel deployment
+
+`https://road-atlas.vercel.app` is one Vercel project serving both the SPA and the API from the same
+origin:
+
+- Root directory `.`, framework preset `None`, output directory `client/dist`.
+- Build command `npm run build:api -w server && npm run build -w client`. The first step bundles
+  `server/src/serverless.ts` into `api/_server.cjs` (CommonJS, dependencies external) because the
+  Express source is TypeScript with bundler-style imports that Vercel's own compiler does not resolve.
+- `vercel.json` sends `/api/*` to the `api/index.mjs` function and everything else to
+  `/index.html`. The API rewrite has to stay above the SPA fallback, otherwise `/api/*` returns HTML.
+- Variables for both Production and Preview: `MONGODB_URI`, `JWT_SECRET`, `CLIENT_ORIGIN`
+  (`https://road-atlas.vercel.app`). Vercel sets `NODE_ENV=production` itself.
+- `api/_server.cjs` is generated and git-ignored — never edit it by hand; run `npm run build:api -w server`
+  if you need it locally.
+- `connectDb()` caches the connection (and the in-flight connect promise) across invocations, so a warm
+  function reuses one pool. If the database is unreachable the function still boots and data routes
+  answer 503.
+- Atlas must allow `0.0.0.0/0` in Network Access: Vercel functions have no fixed egress address.
+
+Deploy and verify:
+
+```bash
+vercel --prod
+curl -s https://road-atlas.vercel.app/api/health   # expect "database":"connected"
+```
+
+`database: "disabled"` means `MONGODB_URI` is missing; `"disconnected"` means it is set but unreachable
+(check the Atlas IP allowlist and the password).
+
+## Adding real content
+
+Local data lives in the `roadatlas-mongo` container (`podman start roadatlas-mongo`; the volume keeps it
+across restarts). Two ways to add records:
+
+1. The owner UI: sign in at `/login`, then use the dashboard / `/map` actions. This is the normal path
+   and the only one that fills progress and notes.
+2. `scripts/add-hub.mjs` for the initial structure. It reads `scripts/hub-content.json` (one hub plus its child
+   tech roadmaps) and upserts by `legacyKey`, so editing the JSON and re-running updates the same nodes:
+
+```bash
+node scripts/add-hub.mjs
+```
+
+Parent rules apply (`hub → hub|tech|pipeline`, `tech → tech`, `pipeline → pipeline`), so a hub's children
+must be `tech` or nested hubs.
+
+## Copying the local database to Atlas
+
+`mongodump`/`mongorestore` run inside the container, which is the only place they are installed:
+
+```bash
+ATLAS_URI='mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/roadatlas' ./scripts/push-db-to-atlas.sh
+```
+
+The dump is written to a temp file first, then restored into the `roadatlas` database and verified by
+counting `users`, `roadmaps`, `steps`, `progresses` and `foci`. Add `--drop --yes` to empty the remote
+collections before restoring; without it the restore upserts by `_id`. `TARGET_DB` overrides the target
+database name. Because the owner's password hash travels with `users`, the login works on the target
+exactly as it does locally.
 
 ## Deploy checklist
 

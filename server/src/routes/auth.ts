@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { hasDb } from '../config/env';
+import { UserModel } from '../models/index';
 import {
   authenticateOwner,
   authConfigured,
   createSessionToken,
+  publicSessionUser,
   readSession,
   SESSION_COOKIE,
   sessionCookieOptions,
@@ -26,7 +29,7 @@ const credentialsSchema = z.object({
 authRouter.get('/session', async (req, res, next) => {
   try {
     const user = await readSession(req.cookies?.[SESSION_COOKIE]);
-    res.json({ authenticated: Boolean(user), user });
+    res.json({ authenticated: Boolean(user), user: user ? publicSessionUser(user) : null });
   } catch (error) {
     next(error);
   }
@@ -52,13 +55,21 @@ authRouter.post('/login', loginLimiter, async (req, res, next) => {
     }
 
     res.cookie(SESSION_COOKIE, createSessionToken(user), sessionCookieOptions());
-    res.json({ authenticated: true, user });
+    res.json({ authenticated: true, user: publicSessionUser(user) });
   } catch (error) {
     next(error);
   }
 });
 
-authRouter.post('/logout', (_req, res) => {
-  res.clearCookie(SESSION_COOKIE, sessionCookieOptions(false));
-  res.json({ authenticated: false, user: null });
+authRouter.post('/logout', async (req, res, next) => {
+  try {
+    const user = await readSession(req.cookies?.[SESSION_COOKIE]);
+    if (user && hasDb) {
+      await UserModel.updateOne({ _id: user.id }, { $inc: { sessionVersion: 1 } });
+    }
+    res.clearCookie(SESSION_COOKIE, sessionCookieOptions(false));
+    res.json({ authenticated: false, user: null });
+  } catch (error) {
+    next(error);
+  }
 });

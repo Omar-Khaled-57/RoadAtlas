@@ -49,6 +49,27 @@ beforeEach(async () => {
   ]);
 });
 
+describe('owner session', () => {
+  it('revokes the session when the owner logs out', async () => {
+    const session = await createUser('revoked@example.com');
+
+    const before = await call('get', '/api/auth/session', { token: session.token });
+    expect(before.body.authenticated).toBe(true);
+
+    const logout = await call('post', '/api/auth/logout', { token: session.token });
+    expect(logout.status).toBe(200);
+
+    const after = await call('get', '/api/auth/session', { token: session.token });
+    expect(after.body.authenticated).toBe(false);
+
+    const write = await call('post', '/api/roadmaps', { token: session.token }).send({
+      kind: 'tech',
+      title: { en: 'Replay' },
+    });
+    expect(write.status).toBe(401);
+  });
+});
+
 describe('roadmap ownership', () => {
   it('rejects an unauthenticated create', async () => {
     const res = await call('post', '/api/roadmaps').send({
@@ -68,24 +89,120 @@ describe('roadmap ownership', () => {
     expect(res.status).toBe(403);
   });
 
-  it('creates a roadmap privately by default and hides it from anonymous reads', async () => {
+  it('creates a roadmap publicly by default and serves it to anonymous readers', async () => {
     const created = await call('post', '/api/roadmaps', { token: owner.token }).send({
       kind: 'tech',
       title: { en: 'Electron', ar: 'إلكترون' },
     });
 
     expect(created.status).toBe(201);
-    expect(created.body.visibility).toBe('private');
+    expect(created.body.visibility).toBe('public');
     expect(created.body.title.en).toBe('Electron');
     expect(created.body.title.ar).toBe('إلكترون');
     expect(created.body.ownerId).toBe(owner.id);
 
     const anonymous = await call('get', '/api/roadmaps');
     expect(anonymous.status).toBe(200);
-    expect(anonymous.body.items).toHaveLength(0);
+    expect(anonymous.body.items).toHaveLength(1);
+    // Anonymous readers must not learn who owns a public record...
+    expect(anonymous.body.items[0].ownerId).toBeUndefined();
+
+    // ...but signed-in callers need `ownerId` to recognise their own records.
+    const signedIn = await call('get', '/api/roadmaps', { token: owner.token });
+    expect(signedIn.body.items[0].ownerId).toBe(owner.id);
 
     const direct = await call('get', `/api/roadmaps/${created.body.id}`);
-    expect(direct.status).toBe(404);
+    expect(direct.status).toBe(200);
+  });
+
+  it('allows hub → tech children, rejects incompatible parents, and exposes status/icon/image in the DTO', async () => {
+    const parent = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'Hub' },
+    });
+    expect(parent.status).toBe(201);
+
+    // A hub is the top-level container: it may hold technology roadmaps.
+    const techChild = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'tech',
+      title: { en: 'React' },
+      parentId: parent.body.id,
+    });
+    expect(techChild.status).toBe(201);
+    expect(techChild.body.parentId).toBe(parent.body.id);
+
+    // A technology roadmap cannot become a container for a hub.
+    const crossKind = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'Wrong kind child' },
+      parentId: techChild.body.id,
+    });
+    expect(crossKind.status).toBe(400);
+    expect(crossKind.body.message).toMatch(/cannot contain/);
+
+    const orphan = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'Orphan' },
+      parentId: '665f1f77bcf86cd799439999',
+    });
+    expect(orphan.status).toBe(400);
+
+    const child = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'Child' },
+      parentId: parent.body.id,
+      status: 'finished',
+      icon: 'Workflow',
+      image: 'https://example.com/logo.png',
+    });
+    expect(child.status).toBe(201);
+    expect(child.body.parentId).toBe(parent.body.id);
+    expect(child.body.status).toBe('finished');
+    expect(child.body.icon).toBe('Workflow');
+    expect(child.body.image).toBe('https://example.com/logo.png');
+  });
+
+  it('guards kind changes and deep parent cycles on update', async () => {
+    const a = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'A' },
+    });
+    const b = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'B' },
+      parentId: a.body.id,
+    });
+    const c = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'hub',
+      title: { en: 'C' },
+      parentId: b.body.id,
+    });
+    expect(c.body.parentId).toBe(b.body.id);
+
+    // Re-parenting the root under its own grandchild must fail, not recurse forever.
+    const cycle = await call('patch', `/api/roadmaps/${a.body.id}`, { token: owner.token }).send({
+      parentId: c.body.id,
+    });
+    expect(cycle.status).toBe(400);
+    expect(cycle.body.message).toMatch(/Circular/);
+
+    // Changing a parent's kind while its child keeps the old kind must fail.
+    const kindChange = await call('patch', `/api/roadmaps/${a.body.id}`, {
+      token: owner.token,
+    }).send({ kind: 'tech' });
+    expect(kindChange.status).toBe(400);
+    expect(kindChange.body.message).toMatch(/cannot contain/);
+
+    // A kind change with no parent or children is still allowed.
+    const solo = await call('post', '/api/roadmaps', { token: owner.token }).send({
+      kind: 'tech',
+      title: { en: 'Solo' },
+    });
+    const soloChange = await call('patch', `/api/roadmaps/${solo.body.id}`, {
+      token: owner.token,
+    }).send({ kind: 'pipeline' });
+    expect(soloChange.status).toBe(200);
+    expect(soloChange.body.kind).toBe('pipeline');
   });
 
   it('lists the owner records for the owner only', async () => {
@@ -106,15 +223,15 @@ describe('roadmap ownership', () => {
     expect(anonymousScope.status).toBe(401);
   });
 
-  it('lets another account neither read nor change a private record', async () => {
+  it('lets another account read a public record but not change it; owner can make it private', async () => {
     const created = await call('post', '/api/roadmaps', { token: owner.token }).send({
       kind: 'tech',
-      title: { en: 'Private' },
+      title: { en: 'Shared' },
     });
     const id = created.body.id as string;
 
     const read = await call('get', `/api/roadmaps/${id}`, { token: other.token });
-    expect(read.status).toBe(404);
+    expect(read.status).toBe(200);
 
     const update = await call('patch', `/api/roadmaps/${id}`, { token: other.token }).send({
       title: { en: 'Hijacked' },
@@ -124,9 +241,14 @@ describe('roadmap ownership', () => {
     const remove = await call('delete', `/api/roadmaps/${id}`, { token: other.token });
     expect(remove.status).toBe(404);
 
-    const stillThere = await call('get', `/api/roadmaps/${id}`, { token: owner.token });
-    expect(stillThere.status).toBe(200);
-    expect(stillThere.body.title.en).toBe('Private');
+    const privateRoadmap = await call('patch', `/api/roadmaps/${id}`, { token: owner.token }).send({
+      visibility: 'private',
+    });
+    expect(privateRoadmap.status).toBe(200);
+    expect(privateRoadmap.body.visibility).toBe('private');
+
+    const readAfter = await call('get', `/api/roadmaps/${id}`, { token: other.token });
+    expect(readAfter.status).toBe(404);
   });
 
   it('publishes a roadmap and serves it to anonymous readers', async () => {
@@ -300,6 +422,7 @@ describe('knowledge content', () => {
       targetId: 'flutter',
       title: { en: 'Private note' },
       content: { en: 'Only mine' },
+      visibility: 'private',
     });
 
     const anonymous = await call('get', '/api/notes');

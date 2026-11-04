@@ -3,6 +3,7 @@ import type {
   Comparison,
   DecisionRecord,
   Focus,
+  FocusItem,
   ID,
   LocalizedString,
   Metric,
@@ -13,6 +14,7 @@ import type {
   RoadmapKind,
   Step,
   Visibility,
+  WeeklyFocusItem,
 } from '@shared/index';
 
 /** Typed access to the RoadAtlas API. The client never trusts its own copy of the data. */
@@ -25,23 +27,35 @@ export interface FocusInput {
   currentTechId?: string | null;
   currentProjectId?: ID | null;
   lastVisited?: { roadmapId: ID; stepId?: ID; at: string } | null;
+  items?: FocusItem[];
+  weeklyFocus?: WeeklyFocusItem[];
 }
 
 export interface StepInput {
   title: LocalizedString;
   description?: LocalizedString;
-  stage?: PipelineStage;
+  stage?: PipelineStage | null;
   resources?: { label: string; url: string }[];
+  order?: number;
+  revision?: number;
 }
 
 export interface RoadmapInput {
   title: LocalizedString;
-  description?: LocalizedString;
+  description?: LocalizedString | null;
   kind: RoadmapKind;
   visibility?: Visibility;
-  parentId?: string;
-  techId?: string;
+  parentId?: string | null;
+  techId?: string | null;
+  order?: number;
+  prerequisites?: string[];
+  topics?: string[];
   steps?: StepInput[];
+  paused?: boolean;
+  status?: 'planned' | 'in_progress' | 'finished' | 'paused';
+  icon?: string;
+  image?: string;
+  revision?: number;
 }
 
 export const roadmapsApi = {
@@ -69,8 +83,10 @@ export const stepsApi = {
   remove: async (id: ID): Promise<void> => {
     await api.delete(`/api/steps/${id}`);
   },
-  setProgress: async (id: ID, done: boolean): Promise<Progress> =>
-    (await api.put<Progress>(`/api/steps/${id}/progress`, { done })).data,
+  setProgress: async (
+    id: ID,
+    payload: { done?: boolean; status?: string; percent?: number },
+  ): Promise<Progress> => (await api.put<Progress>(`/api/steps/${id}/progress`, payload)).data,
 };
 
 export type NoteInput = Pick<
@@ -92,9 +108,18 @@ export const notesApi = {
 };
 
 export const comparisonsApi = {
-  list: async (scope: 'public' | 'owner'): Promise<Comparison[]> =>
+  list: async (scope: 'public' | 'owner' = 'public'): Promise<Comparison[]> =>
     (await api.get<ItemsResponse<Comparison>>('/api/comparisons', { params: { scope } })).data
       .items,
+  getById: async (id: ID): Promise<Comparison> =>
+    (await api.get<Comparison>(`/api/comparisons/${id}`)).data,
+  create: async (input: Partial<Comparison>): Promise<Comparison> =>
+    (await api.post<Comparison>('/api/comparisons', input)).data,
+  update: async (id: ID, input: Partial<Comparison>): Promise<Comparison> =>
+    (await api.patch<Comparison>(`/api/comparisons/${id}`, input)).data,
+  remove: async (id: ID): Promise<void> => {
+    await api.delete(`/api/comparisons/${id}`);
+  },
 };
 
 export const metricsApi = {

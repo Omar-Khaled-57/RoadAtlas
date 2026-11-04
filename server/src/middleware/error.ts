@@ -21,10 +21,11 @@ function errorFields(err: unknown): Record<string, unknown> {
   return { value: err };
 }
 
-export function notFound(req: Request, res: Response): void {
+export function notFound(_req: Request, res: Response): void {
   const requestId = requestIdOf(res);
+  // Do not echo the request URL back: the request id is the only safe correlator.
   const body: ApiError = {
-    message: `Not found: ${req.method} ${req.originalUrl}`,
+    message: 'Not found.',
     ...(requestId ? { requestId } : {}),
   };
   res.status(404).json(body);

@@ -577,6 +577,7 @@ body {
 }
 .orbit {
   position: absolute;
+  z-index: 0;
   left: 50%;
   top: 50%;
   border: 1px solid var(--border-default);
@@ -617,8 +618,16 @@ body {
     0 0 42px color-mix(in srgb, var(--primary) 19%, transparent),
     inset 0 0 25px var(--primary-soft);
 }
+@media (orientation: portrait) {
+  /* Keep the orbit core label small on portrait screens so it never
+     crowds the compass inside the orbit core. */
+  .orbit-core .text-\[10px\] {
+    font-size: 8px;
+  }
+}
 .orbit-node {
   position: absolute;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -667,6 +676,11 @@ body {
   padding: 12px;
   background: color-mix(in srgb, var(--surface-solid) 48%, transparent);
 }
+.focus-tile--highlight {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border-subtle));
+  background: color-mix(in srgb, var(--primary-soft) 42%, var(--surface-solid));
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 14%, transparent);
+}
 .focus-dot {
   width: 8px;
   height: 8px;
@@ -691,6 +705,89 @@ body {
 }
 .surface-card:hover {
   border-color: var(--border-strong);
+}
+.focus-meter {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--surface-active) 86%, transparent);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+.focus-meter__bar {
+  height: 100%;
+  border-radius: inherit;
+  transition:
+    width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.focus-meter--highlight {
+  height: 0.85rem;
+  overflow: visible;
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-subtle));
+  background: color-mix(in srgb, var(--surface-active) 94%, transparent);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--fg-inverse) 15%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.focus-meter__bar--highlight {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    100deg,
+    var(--primary-active) 0%,
+    var(--accent) 52%,
+    var(--secondary) 100%
+  );
+  box-shadow:
+    0 0 7px color-mix(in srgb, var(--primary) 82%, transparent),
+    0 0 16px color-mix(in srgb, var(--accent) 72%, transparent),
+    0 0 27px color-mix(in srgb, var(--secondary) 56%, transparent);
+  animation: focus-meter-glow 2.8s ease-in-out infinite alternate;
+}
+.focus-meter__bar--highlight::after {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 32%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--gloss), transparent);
+  content: '';
+  animation: focus-meter-shimmer 3.6s ease-in-out infinite;
+}
+.focus-label-highlight {
+  color: var(--fg-primary);
+}
+@keyframes focus-meter-shimmer {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+@keyframes focus-meter-glow {
+  from {
+    filter: saturate(1.12) brightness(1.02);
+    box-shadow:
+      0 0 8px color-mix(in srgb, var(--primary) 82%, transparent),
+      0 0 18px color-mix(in srgb, var(--accent) 72%, transparent),
+      0 0 28px color-mix(in srgb, var(--secondary) 56%, transparent);
+  }
+  to {
+    filter: saturate(1.35) brightness(1.14);
+    box-shadow:
+      0 0 11px color-mix(in srgb, var(--primary) 92%, transparent),
+      0 0 24px color-mix(in srgb, var(--accent) 82%, transparent),
+      0 0 36px color-mix(in srgb, var(--secondary) 66%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .focus-meter__bar--highlight,
+  .focus-meter__bar--highlight::after {
+    animation: none;
+  }
 }
 .icon-tile {
   width: 42px;
@@ -822,6 +919,68 @@ body {
   opacity: 1;
   box-shadow: 0 0 18px color-mix(in srgb, var(--primary) 30%, transparent);
 }
+.weekly-focus-bar {
+  width: min(72%, 36px);
+  border-radius: 7px 7px 3px 3px;
+}
+.weekly-focus-chart {
+  overflow: visible;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+.weekly-focus-chart--scroll {
+  box-sizing: content-box;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-inline: -20px;
+  padding: 24px 36px 20px;
+}
+.weekly-focus-label {
+  overflow-wrap: anywhere;
+}
+.weekly-focus-bar--visitor {
+  width: 100%;
+  max-width: 56px;
+}
+.activity-bar--focus-highlight {
+  background: linear-gradient(165deg, var(--secondary), var(--accent) 48%, var(--primary));
+  opacity: 1;
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--primary) 78%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent) 68%, transparent),
+    0 0 30px color-mix(in srgb, var(--secondary) 44%, transparent);
+  animation: weekly-focus-bar-glow 2.8s ease-in-out infinite alternate;
+}
+@media (max-width: 640px) {
+  .weekly-focus-chart {
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-sizing: content-box;
+    margin-inline: -20px;
+    padding: 24px 36px 20px;
+  }
+}
+@keyframes weekly-focus-bar-glow {
+  from {
+    filter: saturate(1.08) brightness(1.02);
+    box-shadow:
+      0 0 7px color-mix(in srgb, var(--primary) 72%, transparent),
+      0 0 15px color-mix(in srgb, var(--accent) 62%, transparent),
+      0 0 25px color-mix(in srgb, var(--secondary) 38%, transparent);
+  }
+  to {
+    filter: saturate(1.32) brightness(1.14);
+    box-shadow:
+      0 0 11px color-mix(in srgb, var(--primary) 90%, transparent),
+      0 0 23px color-mix(in srgb, var(--accent) 80%, transparent),
+      0 0 35px color-mix(in srgb, var(--secondary) 58%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-bar--focus-highlight {
+    animation: none;
+  }
+}
 .roadmap-card {
   position: relative;
   overflow: hidden;
@@ -862,6 +1021,16 @@ body {
   background: radial-gradient(
     120% 85% at 88% -12%,
     color-mix(in srgb, var(--card-tone) 18%, transparent),
+    transparent 65%
+  );
+}
+.roadmap-card--pipeline {
+  border-inline-start-color: var(--success);
+}
+.roadmap-card--pipeline::before {
+  background: radial-gradient(
+    120% 85% at 88% -12%,
+    color-mix(in srgb, var(--success) 16%, transparent),
     transparent 65%
   );
 }
@@ -1299,7 +1468,7 @@ body {
 /* A slow, layered motion system gives the atlas a little life without
    pulling attention away from the page content. */
 .hero-orbit {
-  transform-style: preserve-3d;
+  transform-style: flat;
 }
 .orbit-aura {
   position: absolute;
@@ -1316,10 +1485,13 @@ body {
 }
 .orbit-system {
   position: absolute;
-  z-index: 1;
+  z-index: 0;
   inset: 0;
   transform-origin: center;
-  transform-style: preserve-3d;
+  /* Flatten children to one plane so z-index (not 3D depth) controls stacking.
+     With preserve-3d the rotating system would depth-sort circles and nodes,
+     making the orbiting boxes snap in front of / behind the big circle. */
+  transform-style: flat;
   container-type: size;
   animation: orbit-system-3d 3s ease-in-out infinite;
 }
@@ -1824,6 +1996,32 @@ body {
 .roadmap-node--pipeline .roadmap-node__progress span {
   background: var(--accent);
 }
+.roadmap-node__add {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-inline-start: auto;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg-secondary);
+}
+.roadmap-node__actions {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+.roadmap-node__actions .roadmap-node__add {
+  margin-inline-start: 0;
+}
+.roadmap-node__add:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+  color: var(--primary);
+}
 
 .map-detail {
   position: fixed;
@@ -1869,6 +2067,21 @@ body {
   .map-detail {
     transition: none;
   }
+}
+.map-detail__owner {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.map-detail__owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.map-detail__owner-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
 }
 .map-detail__head {
   display: flex;
@@ -2131,4 +2344,29 @@ button.tag-chip:hover {
 .markdown-content h3,
 .markdown-content h4 {
   font-size: 1.15rem;
+}
+
+/* Theme-aware autofill for form inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+textarea:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus,
+select:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--fg-primary);
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px var(--surface-solid) inset;
+  border-color: var(--border-focus);
+}
+
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  caret-color: var(--fg-primary);
 }

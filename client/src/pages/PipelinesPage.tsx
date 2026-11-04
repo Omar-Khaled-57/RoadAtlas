@@ -1,32 +1,60 @@
-import { useQuery } from '@tanstack/react-query';
-import { ArrowUpRight, Plus, Workflow } from 'lucide-react';
+import { ArrowUpRight, LoaderCircle, Plus, Workflow } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageMeta } from '../lib/seo';
 
-import { Link } from 'react-router-dom';
-import type { AuthSession } from '@shared/index';
-import { api } from '../lib/api';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatDate } from '../lib/format';
 import { localize } from '../lib/localize';
-import {
-  currentStage,
-  pipelineRoadmaps,
-  roadmapProgress,
-  roadmapStatus,
-  type RoadmapSeed,
-} from '../data/roadmaps';
+import { currentStage, roadmapProgress, roadmapStatus } from '../data/roadmaps';
+import { useRoadmapGraph, type RoadmapView } from '../data/roadmapGraph';
 import { StatusBadge } from '../components/RoadmapBadges';
+import { Dialog } from '../components/Dialog';
+import { useCreateRoadmap, useSession } from '../data/queries';
+
+const INPUT_CLASS =
+  'w-full rounded-xl border border-border-default bg-surface-solid px-4 py-3 text-start text-sm text-fg-primary outline-none transition placeholder:text-fg-muted focus:border-border-focus focus:ring-2 focus:ring-primary-soft';
 
 export function PipelinesPage() {
   usePageMeta({ titleKey: 'seo.pipelines.title', descriptionKey: 'seo.pipelines.description' });
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const pipelines = pipelineRoadmaps();
-  const { data: session } = useQuery({
-    queryKey: ['session'],
-    queryFn: async () => (await api.get<AuthSession>('/api/auth/session')).data,
-    retry: false,
+  const { roadmaps, isLoading } = useRoadmapGraph();
+  const pipelines = roadmaps.filter((roadmap) => roadmap.kind === 'pipeline');
+  const { data: session } = useSession();
+  const createRoadmap = useCreateRoadmap();
+  const navigate = useNavigate();
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [draft, setDraft] = useState({
+    title: '',
+    titleAr: '',
+    visibility: 'private' as 'public' | 'private',
   });
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft.title.trim()) return;
+    createRoadmap.mutate(
+      {
+        title: draft.titleAr.trim()
+          ? { en: draft.title.trim(), ar: draft.titleAr.trim() }
+          : { en: draft.title.trim() },
+        kind: 'pipeline',
+        visibility: draft.visibility,
+        order: pipelines.length,
+        topics: [],
+        steps: [],
+      },
+      {
+        onSuccess: (roadmap) => {
+          setDialogOpen(false);
+          setDraft({ title: '', titleAr: '', visibility: 'private' });
+          navigate(`/roadmaps/${roadmap.id}`);
+        },
+      },
+    );
+  }
 
   return (
     <div className="page-enter space-y-6">
@@ -39,13 +67,17 @@ export function PipelinesPage() {
         <div className="flex flex-col items-end gap-1">
           {session?.authenticated ? (
             <>
-              <button type="button" className="primary-button" disabled aria-describedby="new-note">
+              <button
+                type="button"
+                className="primary-button"
+                disabled={createRoadmap.isPending}
+                onClick={() => setDialogOpen(true)}
+              >
                 <Plus aria-hidden="true" className="h-4 w-4" />
-                {t('pipelines.newPipeline')}
+                {createRoadmap.isPending
+                  ? t('workspace.form.creating')
+                  : t('pipelines.newPipeline')}
               </button>
-              <span id="new-note" className="text-xs text-fg-muted">
-                {t('pipelines.newUnavailable')}
-              </span>
             </>
           ) : (
             <p className="text-sm text-fg-muted">
@@ -55,7 +87,96 @@ export function PipelinesPage() {
         </div>
       </header>
 
-      {pipelines.length > 0 ? (
+      <Dialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setDraft({ title: '', titleAr: '', visibility: 'private' });
+        }}
+        titleKey="pipelines.newPipeline"
+      >
+        <form onSubmit={submit} className="grid gap-4" noValidate>
+          <div className="grid gap-2">
+            <label htmlFor="pipe-title-en" className="text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.titleEn')}
+            </label>
+            <input
+              id="pipe-title-en"
+              name="title"
+              required
+              maxLength={300}
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              className={INPUT_CLASS}
+              autoFocus
+            />
+          </div>
+          <div className="grid gap-2">
+            <label htmlFor="pipe-title-ar" className="text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.titleAr')}
+            </label>
+            <input
+              id="pipe-title-ar"
+              name="titleAr"
+              dir="rtl"
+              maxLength={300}
+              value={draft.titleAr}
+              onChange={(event) => setDraft({ ...draft, titleAr: event.target.value })}
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div className="grid gap-2">
+            <label htmlFor="pipe-visibility" className="text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.visibility')}
+            </label>
+            <select
+              id="pipe-visibility"
+              name="visibility"
+              value={draft.visibility}
+              onChange={(event) =>
+                setDraft({ ...draft, visibility: event.target.value as 'public' | 'private' })
+              }
+              className={INPUT_CLASS}
+            >
+              <option value="private">{t('workspace.visibility.private')}</option>
+              <option value="public">{t('workspace.visibility.public')}</option>
+            </select>
+          </div>
+          {createRoadmap.isError ? (
+            <p role="alert" className="text-sm text-error">
+              {t('workspace.createError')}
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={createRoadmap.isPending || !draft.title.trim()}
+              className="primary-button min-h-11 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {createRoadmap.isPending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : null}
+              {createRoadmap.isPending ? t('workspace.form.creating') : t('workspace.form.create')}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setDialogOpen(false);
+                setDraft({ title: '', titleAr: '', visibility: 'private' });
+              }}
+            >
+              {t('workspace.form.cancel')}
+            </button>
+          </div>
+        </form>
+      </Dialog>
+
+      {isLoading ? (
+        <p role="status" className="text-sm text-fg-muted">
+          {t('common.loading')}
+        </p>
+      ) : pipelines.length > 0 ? (
         <ul className="grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3">
           {pipelines.map((pipeline) => (
             <li key={pipeline.id}>
@@ -81,14 +202,14 @@ export function PipelinesPage() {
   );
 }
 
-function PipelineCard({ roadmap, lang }: { roadmap: RoadmapSeed; lang: string }) {
+function PipelineCard({ roadmap, lang }: { roadmap: RoadmapView; lang: string }) {
   const { t } = useTranslation();
   const progress = roadmapProgress(roadmap);
   const stage = currentStage(roadmap);
   const title = localize(roadmap.title, lang);
 
   return (
-    <article className="roadmap-card">
+    <article className="roadmap-card roadmap-card--pipeline">
       <div className="flex items-start justify-between gap-3">
         <span className="roadmap-icon tone-success">
           <Workflow aria-hidden="true" />

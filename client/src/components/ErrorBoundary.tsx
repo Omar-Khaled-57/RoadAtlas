@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { withTranslation, type WithTranslation } from 'react-i18next';
+import { reportClientError } from '../lib/reportError';
 
 type Props = WithTranslation & { children: ReactNode };
 type State = { hasError: boolean };
@@ -9,6 +10,10 @@ class ErrorBoundaryInner extends Component<Props, State> {
 
   static getDerivedStateFromError(): State {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    reportClientError(error, { componentStack: info.componentStack });
   }
 
   render() {

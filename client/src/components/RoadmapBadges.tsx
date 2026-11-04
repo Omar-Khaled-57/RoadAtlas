@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { RoadmapKind } from '@shared/index';
-import type { RoadmapStatus } from '../data/roadmaps';
+import type { RoadmapDisplayStatus } from '../data/roadmaps';
 
 export function KindBadge({ kind }: { kind: RoadmapKind }) {
   const { t } = useTranslation();
@@ -12,7 +12,7 @@ export function KindBadge({ kind }: { kind: RoadmapKind }) {
   );
 }
 
-export function StatusBadge({ status }: { status: RoadmapStatus }) {
+export function StatusBadge({ status }: { status: RoadmapDisplayStatus }) {
   const { t } = useTranslation();
   return (
     <span className={`status-badge status-badge--${status}`}>

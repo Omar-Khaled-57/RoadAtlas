@@ -23,8 +23,8 @@ destinations, ordered by priority.
 ### 1. Hero
 
 - **Purpose:** welcome, and instantly show _what I'm on now_.
-- **Content:** product name + one-line value prop; two **dynamic** focus cards — **Current tech** and
-  **Current project** — read from `Focus` (not curated); primary CTAs (**Explore the map** →
+- **Content:** product name + one-line value prop; owner-managed focus cards for **Current tech**,
+  **Current project**, and **Next milestone**, linked to their roadmap or step records; primary CTAs (**Explore the map** →
   `/map`, **Browse roadmaps** → `/roadmaps`).
 - **Interactions:** CTAs navigate; focus cards link to their entity.
 - **States:** default · skeleton while focus data loads · fallback when there is no active tech/project.
@@ -40,7 +40,7 @@ destinations, ordered by priority.
 ### 3. Continue where you left off
 
 - **Purpose:** one-click resume for the owner.
-- **Content:** last visited roadmap + step, with progress. **Per owner** (`Focus.lastVisited` +
+- **Content:** last visited roadmap + next incomplete step, with progress. **Per owner** (`Focus.lastVisited` +
   `Progress` in the DB).
 - **Interactions:** resumes the roadmap/step; a dismiss control.
 - **States:** default · hidden from visitors or when there is no owner progress.
@@ -49,16 +49,16 @@ destinations, ordered by priority.
 ### 4. Hub map preview
 
 - **Purpose:** a taste of the branching map.
-- **Content:** small, **static SVG / non-interactive** snapshot of the hub graph (hub → tech nodes) —
-  P0 representation of the P1 interactive [map](./map.md).
-- **Interactions:** the whole preview links to `/map`.
+- **Content:** small SVG preview generated from saved public roadmaps and `parentId` edges — P0
+  representation of the P1 interactive [map](./map.md).
+- **Interactions:** roadmap nodes open their detail pages; the preview links to `/map`.
 - **States:** default · skeleton · empty (no roadmaps yet).
 - **Priority:** P0.
 
 ### 5. Roadmap catalog preview
 
 - **Purpose:** surface what exists.
-- **Content:** a handful of roadmap cards (hubs + tech) with progress; link to `/roadmaps`.
+- **Content:** up to ten saved roadmap cards (hubs + tech) with owner-only progress; link to `/roadmaps`.
 - **States:** default · skeleton · empty.
 - **Priority:** P0.
 
@@ -88,3 +88,6 @@ destinations, ordered by priority.
 - Focus cards read from `Focus` ([0004](../decisions/0004-domain-model-v2.md)). Visitors see them
   only when the focus record is explicitly public; otherwise show a curated/static portfolio fallback.
 - Continue uses `Focus.lastVisited` and is always private to its owner.
+- Owner focus rows reference a tech roadmap, pipeline roadmap, or pipeline step. The owner can add,
+  remove, reorder, and highlight up to two rows. Their titles, links, and progress are derived from
+  the referenced records; anonymous visitors never receive this private focus data.

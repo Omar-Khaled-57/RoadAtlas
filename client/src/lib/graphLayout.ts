@@ -1,4 +1,4 @@
-import type { ID, Roadmap } from '@shared/index';
+import type { ID } from '@shared/index';
 
 export interface Point {
   x: number;
@@ -19,12 +19,12 @@ export interface LayoutOptions {
  * Coordinates are direction-neutral (RTL only mirrors the surrounding chrome).
  */
 export function layoutRoadmaps(
-  roadmaps: Roadmap[],
+  roadmaps: Array<{ id: ID; parentId?: ID; order?: number }>,
   { xGap = 288, yGap = 118 }: LayoutOptions = {},
 ): Record<ID, Point> {
   const ids = new Set(roadmaps.map((r) => r.id));
-  const children = new Map<ID, Roadmap[]>();
-  const roots: Roadmap[] = [];
+  const children = new Map<ID, Array<{ id: ID; parentId?: ID; order?: number }>>();
+  const roots: Array<{ id: ID; parentId?: ID; order?: number }> = [];
 
   for (const r of roadmaps) {
     if (r.parentId && ids.has(r.parentId)) {
@@ -36,14 +36,14 @@ export function layoutRoadmaps(
     }
   }
 
-  const byOrder = (a: Roadmap, b: Roadmap) => a.order - b.order;
+  const byOrder = (a: { order?: number }, b: { order?: number }) => (a.order ?? 0) - (b.order ?? 0);
   roots.sort(byOrder);
   for (const list of children.values()) list.sort(byOrder);
 
   const positions: Record<ID, Point> = {};
   let cursor = 0;
 
-  const visit = (node: Roadmap, depth: number): number => {
+  const visit = (node: { id: ID; parentId?: ID; order?: number }, depth: number): number => {
     const kids = children.get(node.id) ?? [];
     if (kids.length === 0) {
       const y = cursor;

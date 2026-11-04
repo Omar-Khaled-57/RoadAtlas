@@ -6,15 +6,21 @@ import { KindBadge } from './RoadmapBadges';
 import { ProgressRing } from './ProgressRing';
 import {
   useAddStep,
+  useDeleteStep,
   useDeleteRoadmap,
   useOwnerRoadmap,
+  useSession,
   useRoadmapProgress,
   useRoadmapSteps,
   useSetFocus,
   useSetStepProgress,
   useUpdateRoadmap,
+  useUpdateStep,
+  useOwnerRoadmaps,
 } from '../data/queries';
 import { localize } from '../lib/localize';
+import { canContain } from '../lib/roadmapMeta';
+import { techProfiles } from '../data/techCatalogue';
 import type { ID, PipelineStage } from '@shared/index';
 
 const INPUT_CLASS =
@@ -27,27 +33,61 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const navigate = useNavigate();
+  const { data: session } = useSession();
 
   const roadmap = useOwnerRoadmap(id);
   const steps = useRoadmapSteps(id);
-  const progress = useRoadmapProgress(id);
+  const isOwner = Boolean(session?.authenticated && session.user?.id === roadmap.data?.ownerId);
+  const allRoadmaps = useOwnerRoadmaps(isOwner);
+  const progress = useRoadmapProgress(id, isOwner);
   const setProgress = useSetStepProgress();
   const addStep = useAddStep();
+  const updateStep = useUpdateStep();
+  const deleteStep = useDeleteStep();
   const updateRoadmap = useUpdateRoadmap();
   const removeRoadmap = useDeleteRoadmap();
 
   const setFocus = useSetFocus();
   const [stepTitle, setStepTitle] = useState('');
   const [stepStage, setStepStage] = useState<PipelineStage | ''>('');
+  const [editingStep, setEditingStep] = useState<ID | null>(null);
+  const [stepDraft, setStepDraft] = useState({
+    title: '',
+    titleAr: '',
+    stage: '' as PipelineStage | '',
+  });
+  const [editingRoadmap, setEditingRoadmap] = useState(false);
+  const [roadmapDraft, setRoadmapDraft] = useState({
+    title: '',
+    titleAr: '',
+    description: '',
+    parentId: '',
+    techId: '',
+    topics: '',
+    status: '' as '' | 'planned' | 'in_progress' | 'finished' | 'paused',
+    paused: false,
+    icon: '',
+    image: '',
+  });
   const [confirming, setConfirming] = useState(false);
   const recorded = useRef<string | null>(null);
 
   // Opening an owned roadmap records it as the owner's last visit, once per id.
   useEffect(() => {
-    if (!roadmap.data || recorded.current === id) return;
+    if (!isOwner || !roadmap.data || recorded.current === id) return;
     recorded.current = id;
     setFocus.mutate({ lastVisited: { roadmapId: id, at: new Date().toISOString() } });
-  }, [id, roadmap.data, setFocus]);
+  }, [id, isOwner, roadmap.data, setFocus]);
+
+  useEffect(() => {
+    if (!steps.data || !window.location.hash.startsWith('#step-')) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView({
+        block: 'center',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [steps.data]);
 
   if (roadmap.isError) {
     return (
@@ -86,7 +126,8 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
       : Math.round(
           (stepItems.filter((step) => doneIds.has(step.id)).length / stepItems.length) * 100,
         );
-  const currentStepId = stepItems.find((step) => !doneIds.has(step.id))?.id;
+  const currentStepId = isOwner ? stepItems.find((step) => !doneIds.has(step.id))?.id : undefined;
+  const childRoadmaps = (allRoadmaps.data ?? []).filter((candidate) => candidate.parentId === id);
 
   function submitStep(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,6 +141,81 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
         },
       },
       { onSuccess: () => setStepTitle('') },
+    );
+  }
+
+  function submitRoadmap(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    updateRoadmap.mutate(
+      {
+        id,
+        input: {
+          title: roadmapDraft.titleAr.trim()
+            ? { en: roadmapDraft.title.trim(), ar: roadmapDraft.titleAr.trim() }
+            : { en: roadmapDraft.title.trim() },
+          description: roadmapDraft.description.trim()
+            ? { en: roadmapDraft.description.trim() }
+            : null,
+          parentId: roadmapDraft.parentId || null,
+          ...(item.kind === 'tech' ? { techId: roadmapDraft.techId.trim() || null } : {}),
+          topics: roadmapDraft.topics
+            .split(',')
+            .map((topic) => topic.trim())
+            .filter(Boolean),
+          status: roadmapDraft.status || undefined,
+          // Keep the legacy flag in sync: leaving it set would keep showing "Paused".
+          paused: roadmapDraft.status === 'paused',
+          icon: roadmapDraft.icon.trim() || undefined,
+          image: roadmapDraft.image.trim() || undefined,
+          revision: item.revision ?? 0,
+        },
+      },
+      { onSuccess: () => setEditingRoadmap(false) },
+    );
+  }
+
+  function beginEditRoadmap() {
+    const roadmapItem = item as typeof item & { status?: string; icon?: string; image?: string };
+    setRoadmapDraft({
+      title: item.title.en,
+      titleAr: item.title.ar ?? '',
+      description: item.description?.en ?? '',
+      parentId: item.parentId ?? '',
+      techId: item.techId ?? '',
+      topics: (item.topics ?? []).join(', '),
+      status:
+        (roadmapItem.status as '' | 'planned' | 'in_progress' | 'finished' | 'paused') ??
+        (roadmapItem.paused ? 'paused' : ''),
+      paused: Boolean(roadmapItem.paused),
+      icon: roadmapItem.icon ?? '',
+      image: roadmapItem.image ?? '',
+    });
+    setEditingRoadmap(true);
+  }
+
+  function beginEditStep(step: (typeof stepItems)[number]) {
+    setEditingStep(step.id);
+    setStepDraft({ title: step.title.en, titleAr: step.title.ar ?? '', stage: step.stage ?? '' });
+  }
+
+  function submitStepEdit(
+    event: React.FormEvent<HTMLFormElement>,
+    step: (typeof stepItems)[number],
+  ) {
+    event.preventDefault();
+    updateStep.mutate(
+      {
+        id: step.id,
+        roadmapId: id,
+        input: {
+          title: stepDraft.titleAr.trim()
+            ? { en: stepDraft.title.trim(), ar: stepDraft.titleAr.trim() }
+            : { en: stepDraft.title.trim() },
+          stage: stepDraft.stage || null,
+          revision: step.revision ?? 0,
+        },
+      },
+      { onSuccess: () => setEditingStep(null) },
     );
   }
 
@@ -124,56 +240,214 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
               </p>
             ) : null}
           </div>
-          <ProgressRing
-            value={percent}
-            label={t('roadmaps.progressLabel')}
-            caption={t('roadmaps.progress', { value: percent })}
-          />
+          {isOwner ? (
+            <ProgressRing
+              value={percent}
+              label={t('roadmaps.progressLabel')}
+              caption={t('roadmaps.progress', { value: percent })}
+            />
+          ) : null}
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={updateRoadmap.isPending}
-            onClick={() =>
-              updateRoadmap.mutate({
-                id,
-                input: { visibility: item.visibility === 'public' ? 'private' : 'public' },
-              })
-            }
-          >
-            {item.visibility === 'public'
-              ? t('workspace.detail.unpublish')
-              : t('workspace.detail.publish')}
-          </button>
-          {confirming ? (
-            <>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => {
-                  removeRoadmap.mutate(id, { onSuccess: () => navigate('/roadmaps') });
-                  setConfirming(false);
-                }}
-              >
-                {t('workspace.deleteConfirm')}
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setConfirming(false)}
-              >
-                {t('workspace.deleteCancel')}
-              </button>
-            </>
-          ) : (
-            <button type="button" className="secondary-button" onClick={() => setConfirming(true)}>
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              {t('workspace.delete')}
+        {isOwner ? (
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button type="button" className="secondary-button" onClick={beginEditRoadmap}>
+              {t('common.edit')}
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={updateRoadmap.isPending}
+              onClick={() =>
+                updateRoadmap.mutate({
+                  id,
+                  input: { visibility: item.visibility === 'public' ? 'private' : 'public' },
+                })
+              }
+            >
+              {item.visibility === 'public'
+                ? t('workspace.detail.unpublish')
+                : t('workspace.detail.publish')}
+            </button>
+            {confirming ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    removeRoadmap.mutate(id, { onSuccess: () => navigate('/roadmaps') });
+                    setConfirming(false);
+                  }}
+                >
+                  {t('workspace.deleteConfirm')}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setConfirming(false)}
+                >
+                  {t('workspace.deleteCancel')}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setConfirming(true)}
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {t('workspace.delete')}
+              </button>
+            )}
+          </div>
+        ) : null}
+        {isOwner && editingRoadmap ? (
+          <form
+            onSubmit={submitRoadmap}
+            className="mt-5 grid gap-3 border-t border-border-subtle pt-5"
+          >
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.titleEn')}
+              <input
+                name="roadmap-title-en"
+                required
+                value={roadmapDraft.title}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, title: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.titleAr')}
+              <input
+                name="roadmap-title-ar"
+                dir="rtl"
+                value={roadmapDraft.titleAr}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, titleAr: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.description')}
+              <textarea
+                name="roadmap-description"
+                rows={3}
+                value={roadmapDraft.description}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, description: e.target.value })}
+                className={INPUT_CLASS}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.parent')}
+              <select
+                name="roadmap-parent"
+                value={roadmapDraft.parentId}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, parentId: e.target.value })}
+                className={INPUT_CLASS}
+              >
+                <option value="">{t('workspace.form.noParent')}</option>
+                {(allRoadmaps.data ?? [])
+                  .filter(
+                    (candidate) => candidate.id !== id && canContain(candidate.kind, item.kind),
+                  )
+                  .map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {localize(candidate.title, lang)}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {item.kind === 'tech' ? (
+              <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+                {t('workspace.form.tech')}
+                <select
+                  name="roadmap-tech"
+                  value={roadmapDraft.techId}
+                  onChange={(e) => setRoadmapDraft({ ...roadmapDraft, techId: e.target.value })}
+                  className={INPUT_CLASS}
+                >
+                  <option value="">{t('workspace.form.techNone')}</option>
+                  {techProfiles.map((tech) => (
+                    <option key={tech.id} value={tech.id}>
+                      {localize(tech.name, lang)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.status')}
+              <select
+                name="roadmap-status"
+                value={roadmapDraft.status}
+                onChange={(e) =>
+                  setRoadmapDraft({
+                    ...roadmapDraft,
+                    status: e.target.value as
+                      '' | 'planned' | 'in_progress' | 'finished' | 'paused',
+                  })
+                }
+                className={INPUT_CLASS}
+              >
+                <option value="">{t('workspace.form.statusNone')}</option>
+                <option value="planned">{t('workspace.form.statusPlanned')}</option>
+                <option value="in_progress">{t('workspace.form.statusInProgress')}</option>
+                <option value="finished">{t('workspace.form.statusFinished')}</option>
+                <option value="paused">{t('workspace.form.statusPaused')}</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.icon')}
+              <input
+                name="roadmap-icon"
+                value={roadmapDraft.icon}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, icon: e.target.value })}
+                className={INPUT_CLASS}
+                placeholder={t('workspace.form.iconPlaceholder')}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.image')}
+              <input
+                name="roadmap-image"
+                value={roadmapDraft.image}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, image: e.target.value })}
+                className={INPUT_CLASS}
+                placeholder={t('workspace.form.imagePlaceholder')}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-semibold text-fg-secondary">
+              {t('workspace.form.topics')}
+              <input
+                name="roadmap-topics"
+                value={roadmapDraft.topics}
+                onChange={(e) => setRoadmapDraft({ ...roadmapDraft, topics: e.target.value })}
+                className={INPUT_CLASS}
+                placeholder={t('workspace.form.topicsHint')}
+              />
+            </label>
+            {updateRoadmap.isError ? (
+              <p role="alert" className="text-sm text-error">
+                {t('workspace.detail.updateError')}
+              </p>
+            ) : null}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={updateRoadmap.isPending || !roadmapDraft.title.trim()}
+                className="primary-button"
+              >
+                {t('common.save')}
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setEditingRoadmap(false)}
+              >
+                {t('workspace.form.cancel')}
+              </button>
+            </div>
+          </form>
+        ) : null}
       </header>
 
       <section className="surface-card p-6">
@@ -197,6 +471,8 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
               return (
                 <li
                   key={step.id}
+                  id={`step-${step.id}`}
+                  tabIndex={-1}
                   className={`route-stop${done ? ' is-done' : ''}${current ? ' is-current' : ''}`}
                 >
                   <span className="route-stop__marker" aria-hidden="true">
@@ -215,17 +491,183 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
                         <span className="next-stop-chip">{t('roadmaps.nextStop')}</span>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      aria-pressed={done}
-                      className="secondary-button mt-2"
-                      disabled={setProgress.isPending}
-                      onClick={() =>
-                        setProgress.mutate({ roadmapId: id, stepId: step.id, done: !done })
-                      }
-                    >
-                      {done ? t('workspace.detail.markTodo') : t('workspace.detail.markDone')}
-                    </button>
+                    {isOwner ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          aria-pressed={done}
+                          className="secondary-button"
+                          disabled={setProgress.isPending}
+                          onClick={() =>
+                            setProgress.mutate({
+                              roadmapId: id,
+                              stepId: step.id,
+                              done: !done,
+                              status: done ? 'in_progress' : 'done',
+                            })
+                          }
+                        >
+                          {done ? t('workspace.detail.markTodo') : t('workspace.detail.markDone')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={setProgress.isPending}
+                          onClick={() =>
+                            setProgress.mutate({
+                              roadmapId: id,
+                              stepId: step.id,
+                              status: 'in_progress',
+                              done: false,
+                            })
+                          }
+                        >
+                          {t('workspace.detail.stepInProgress')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={setProgress.isPending}
+                          onClick={() =>
+                            setProgress.mutate({
+                              roadmapId: id,
+                              stepId: step.id,
+                              status: 'partially_done',
+                              done: false,
+                            })
+                          }
+                        >
+                          {t('workspace.detail.stepPartiallyDone')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={setProgress.isPending}
+                          onClick={() =>
+                            setProgress.mutate({
+                              roadmapId: id,
+                              stepId: step.id,
+                              status: 'revisit',
+                              done: false,
+                            })
+                          }
+                        >
+                          {t('workspace.detail.stepRevisit')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={setProgress.isPending}
+                          onClick={() =>
+                            setProgress.mutate({
+                              roadmapId: id,
+                              stepId: step.id,
+                              status: 'test',
+                              done: false,
+                            })
+                          }
+                        >
+                          {t('workspace.detail.stepTest')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={setProgress.isPending}
+                          onClick={() =>
+                            setProgress.mutate({
+                              roadmapId: id,
+                              stepId: step.id,
+                              status: 'revise',
+                              done: false,
+                            })
+                          }
+                        >
+                          {t('workspace.detail.stepRevise')}
+                        </button>
+                      </div>
+                    ) : null}
+                    {isOwner && editingStep === step.id ? (
+                      <form
+                        onSubmit={(event) => submitStepEdit(event, step)}
+                        className="mt-3 grid gap-2"
+                      >
+                        <input
+                          name={`step-${step.id}-title-en`}
+                          aria-label={t('workspace.form.titleEn')}
+                          required
+                          value={stepDraft.title}
+                          onChange={(e) => setStepDraft({ ...stepDraft, title: e.target.value })}
+                          className={INPUT_CLASS}
+                        />
+                        <input
+                          name={`step-${step.id}-title-ar`}
+                          aria-label={t('workspace.form.titleAr')}
+                          dir="rtl"
+                          value={stepDraft.titleAr}
+                          onChange={(e) => setStepDraft({ ...stepDraft, titleAr: e.target.value })}
+                          className={INPUT_CLASS}
+                        />
+                        <select
+                          name={`step-${step.id}-stage`}
+                          aria-label={t('workspace.detail.stepStage')}
+                          value={stepDraft.stage}
+                          onChange={(e) =>
+                            setStepDraft({
+                              ...stepDraft,
+                              stage: e.target.value as PipelineStage | '',
+                            })
+                          }
+                          className={INPUT_CLASS}
+                        >
+                          <option value="">{t('workspace.detail.noStage')}</option>
+                          {STAGES.map((stage) => (
+                            <option key={stage} value={stage}>
+                              {t(`roadmaps.stage.${stage}`)}
+                            </option>
+                          ))}
+                        </select>
+                        {updateStep.isError ? (
+                          <p role="alert" className="text-sm text-error">
+                            {t('workspace.detail.updateError')}
+                          </p>
+                        ) : null}
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={updateStep.isPending || !stepDraft.title.trim()}
+                            className="primary-button"
+                          >
+                            {t('common.save')}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => setEditingStep(null)}
+                          >
+                            {t('workspace.form.cancel')}
+                          </button>
+                        </div>
+                      </form>
+                    ) : isOwner ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => beginEditStep(step)}
+                        >
+                          {t('common.edit')}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={deleteStep.isPending}
+                          onClick={() => deleteStep.mutate({ id: step.id, roadmapId: id })}
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          {t('common.delete')}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               );
@@ -235,56 +677,76 @@ export function OwnerRoadmapDetail({ id }: { id: ID }) {
           <p className="mt-3 text-sm text-fg-muted">{t('workspace.detail.noSteps')}</p>
         )}
 
-        <form onSubmit={submitStep} className="mt-6 grid gap-3 border-t border-border-subtle pt-5">
-          <div className="grid gap-2">
-            <label htmlFor="step-title" className="text-sm font-semibold text-fg-secondary">
-              {t('workspace.detail.stepTitle')}
-            </label>
-            <input
-              id="step-title"
-              name="stepTitle"
-              required
-              maxLength={300}
-              value={stepTitle}
-              onChange={(event) => setStepTitle(event.target.value)}
-              className={INPUT_CLASS}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <label htmlFor="step-stage" className="text-sm font-semibold text-fg-secondary">
-              {t('workspace.detail.stepStage')}
-            </label>
-            <select
-              id="step-stage"
-              name="stepStage"
-              value={stepStage}
-              onChange={(event) => setStepStage(event.target.value as PipelineStage | '')}
-              className={INPUT_CLASS}
-            >
-              <option value="">{t('workspace.detail.noStage')}</option>
-              {STAGES.map((stage) => (
-                <option key={stage} value={stage}>
-                  {t(`roadmaps.stage.${stage}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={addStep.isPending || !stepTitle.trim()}
-            className="primary-button justify-self-start disabled:cursor-not-allowed disabled:opacity-60"
+        {isOwner ? (
+          <form
+            onSubmit={submitStep}
+            className="mt-6 grid gap-3 border-t border-border-subtle pt-5"
           >
-            {addStep.isPending ? (
-              <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <Plus className="h-4 w-4" aria-hidden="true" />
-            )}
-            {addStep.isPending ? t('workspace.detail.adding') : t('workspace.detail.add')}
-          </button>
-        </form>
+            <div className="grid gap-2">
+              <label htmlFor="step-title" className="text-sm font-semibold text-fg-secondary">
+                {t('workspace.detail.stepTitle')}
+              </label>
+              <input
+                id="step-title"
+                name="stepTitle"
+                required
+                maxLength={300}
+                value={stepTitle}
+                onChange={(event) => setStepTitle(event.target.value)}
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label htmlFor="step-stage" className="text-sm font-semibold text-fg-secondary">
+                {t('workspace.detail.stepStage')}
+              </label>
+              <select
+                id="step-stage"
+                name="stepStage"
+                value={stepStage}
+                onChange={(event) => setStepStage(event.target.value as PipelineStage | '')}
+                className={INPUT_CLASS}
+              >
+                <option value="">{t('workspace.detail.noStage')}</option>
+                {STAGES.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {t(`roadmaps.stage.${stage}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={addStep.isPending || !stepTitle.trim()}
+              className="primary-button justify-self-start disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {addStep.isPending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Plus className="h-4 w-4" aria-hidden="true" />
+              )}
+              {addStep.isPending ? t('workspace.detail.adding') : t('workspace.detail.add')}
+            </button>
+          </form>
+        ) : null}
       </section>
+
+      {childRoadmaps.length > 0 ? (
+        <section className="surface-card p-6">
+          <h2 className="text-lg font-bold">{t('roadmaps.branch')}</h2>
+          <ul className="mt-4 grid list-none gap-2 p-0 sm:grid-cols-2 lg:grid-cols-3">
+            {childRoadmaps.map((child) => (
+              <li key={child.id}>
+                <Link to={`/roadmaps/${child.id}`} className="secondary-button w-full">
+                  {localize(child.title, lang)}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

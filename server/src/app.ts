@@ -51,7 +51,7 @@ export function createApp() {
   app.use('/api/comparisons', requirePersistence, comparisonsRouter);
   app.use('/api/notes', requirePersistence, notesRouter);
   app.use('/api/decisions', requirePersistence, decisionsRouter);
-  app.use('/api/focus', requirePersistence, focusRouter);
+  app.use('/api/focus', focusRouter);
 
   app.use(notFound);
   app.use(errorHandler);

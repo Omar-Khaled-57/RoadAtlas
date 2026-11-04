@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "db:dev": "node scripts/dev-db.mjs",
     "build": "tsup src/index.ts --format esm --target node20 --out-dir dist --clean",
+    "build:api": "esbuild src/serverless.ts --bundle --platform=node --format=cjs --target=node22 --packages=external --outfile=../api/_server.cjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
