@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app';
 import { createSessionToken, SESSION_COOKIE } from './middleware/auth';
@@ -7,7 +7,6 @@ import { db } from './models/index';
 const app = createApp();
 const ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
 
-/** A request that behaves like the browser app: same origin, session cookie attached. */
 function call(
   method: 'get' | 'post' | 'patch' | 'put' | 'delete',
   path: string,
@@ -22,29 +21,27 @@ async function createUser(email: string): Promise<{ id: string; email: string; t
   const passwordHash = await import('bcryptjs').then((bcrypt) =>
     bcrypt.default.hash('second-account-password', 10),
   );
-  const user = await db.user.create({ data: { email, passwordHash } });
-  const session = { id: user.id, email: user.email };
+  const user = await db.create('User', { email, passwordHash });
+  const session = { id: (user as { id: string }).id, email: (user as { email: string }).email };
   return { ...session, token: createSessionToken(session) };
 }
 
 let owner: { id: string; email: string; token: string };
 let other: { id: string; email: string; token: string };
 
-beforeAll(async () => {
+beforeEach(async () => {
+  await db.deleteMany('User', {});
   owner = await createUser('owner@example.com');
   other = await createUser('other@example.com');
-});
-
-beforeEach(async () => {
   await Promise.all([
-    db.roadmap.deleteMany(),
-    db.step.deleteMany(),
-    db.progress.deleteMany(),
-    db.note.deleteMany(),
-    db.metric.deleteMany(),
-    db.comparison.deleteMany(),
-    db.decision.deleteMany(),
-    db.focus.deleteMany(),
+    db.deleteMany('Roadmap', {}),
+    db.deleteMany('Step', {}),
+    db.deleteMany('Progress', {}),
+    db.deleteMany('Note', {}),
+    db.deleteMany('Metric', {}),
+    db.deleteMany('Comparison', {}),
+    db.deleteMany('Decision', {}),
+    db.deleteMany('Focus', {}),
   ]);
 });
 
@@ -103,10 +100,8 @@ describe('roadmap ownership', () => {
     const anonymous = await call('get', '/api/roadmaps');
     expect(anonymous.status).toBe(200);
     expect(anonymous.body.items).toHaveLength(1);
-    // Anonymous readers must not learn who owns a public record...
     expect(anonymous.body.items[0].ownerId).toBeUndefined();
 
-    // ...but signed-in callers need `ownerId` to recognise their own records.
     const signedIn = await call('get', '/api/roadmaps', { token: owner.token });
     expect(signedIn.body.items[0].ownerId).toBe(owner.id);
 
@@ -121,7 +116,6 @@ describe('roadmap ownership', () => {
     });
     expect(parent.status).toBe(201);
 
-    // A hub is the top-level container: it may hold technology roadmaps.
     const techChild = await call('post', '/api/roadmaps', { token: owner.token }).send({
       kind: 'tech',
       title: { en: 'React' },
@@ -130,7 +124,6 @@ describe('roadmap ownership', () => {
     expect(techChild.status).toBe(201);
     expect(techChild.body.parentId).toBe(parent.body.id);
 
-    // A technology roadmap cannot become a container for a hub.
     const crossKind = await call('post', '/api/roadmaps', { token: owner.token }).send({
       kind: 'hub',
       title: { en: 'Wrong kind child' },
@@ -178,21 +171,18 @@ describe('roadmap ownership', () => {
     });
     expect(c.body.parentId).toBe(b.body.id);
 
-    // Re-parenting the root under its own grandchild must fail, not recurse forever.
     const cycle = await call('patch', `/api/roadmaps/${a.body.id}`, { token: owner.token }).send({
       parentId: c.body.id,
     });
     expect(cycle.status).toBe(400);
     expect(cycle.body.message).toMatch(/Circular/);
 
-    // Changing a parent's kind while its child keeps the old kind must fail.
     const kindChange = await call('patch', `/api/roadmaps/${a.body.id}`, {
       token: owner.token,
     }).send({ kind: 'tech' });
     expect(kindChange.status).toBe(400);
     expect(kindChange.body.message).toMatch(/cannot contain/);
 
-    // A kind change with no parent or children is still allowed.
     const solo = await call('post', '/api/roadmaps', { token: owner.token }).send({
       kind: 'tech',
       title: { en: 'Solo' },

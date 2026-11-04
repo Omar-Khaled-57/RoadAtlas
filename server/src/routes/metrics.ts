@@ -20,7 +20,7 @@ metricsRouter.get('/', optionalAuth, async (req, res) => {
   const caller = optionalCallerId(res);
   if (techId) filter.techId = techId;
 
-  const docs = await db.metric.findMany({
+  const docs = await db.findMany('Metric', {
     where: filter,
     orderBy: { createdAt: 'asc' },
   });
@@ -37,9 +37,7 @@ metricsRouter.get('/', optionalAuth, async (req, res) => {
 
 metricsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await db.metric.findUnique({
-    where: { id },
-  });
+  const doc = await db.findUnique('Metric', id);
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Metric not found.');
   const dto = toMetricDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -54,9 +52,7 @@ metricsRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createMetricSchema, req.body);
   const ownerId = callerId(res);
 
-  const metric = await db.metric.create({
-    data: { ...input, ownerId },
-  });
+  const metric = await db.create('Metric', { ...input, ownerId });
   res.status(201).json(toMetricDto(metric));
 });
 
@@ -68,12 +64,11 @@ metricsRouter.patch('/:id', requireAuth, async (req, res) => {
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await db.metric.update({
-    where: { id },
-    data: changes,
-  });
+  const existing = await db.findUnique('Metric', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Metric not found.');
 
-  if (!updated || updated.ownerId !== ownerId) throw notFound('Metric not found.');
+  const updated = await db.update('Metric', id, changes);
+
   res.json(toMetricDto(updated));
 });
 
@@ -81,13 +76,9 @@ metricsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const existing = await db.metric.findUnique({
-    where: { id },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Metric not found.');
+  const existing = await db.findUnique('Metric', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Metric not found.');
 
-  await db.metric.delete({
-    where: { id },
-  });
+  await db.del('Metric', id);
   res.status(204).end();
 });

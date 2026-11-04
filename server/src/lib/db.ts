@@ -1,25 +1,15 @@
-import { PrismaClient } from '@prisma/client';
 import { env } from '../config/env';
 import { logger } from '../lib/logger';
+import { pool, closePool } from './pg-db';
+import {
+  findMany, findUnique, findFirst, create, update, del, deleteMany, count,
+} from './dao';
 
 /**
- * Prisma client singleton. Serverless platforms reuse a process across
- * invocations, so caching the client avoids creating a new connection pool
- * for every request.
+ * Connect to PostgreSQL. pg connects lazily on first query, so this just
+ * validates that DATABASE_URL is set. Data routes fail closed with 503 when
+ * DATABASE_URL is absent.
  */
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-  });
-
-if (env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
-
-/** Connect once per process (no-op for Prisma, which connects lazily). */
 export async function connectDb(): Promise<void> {
   if (!env.DATABASE_URL) {
     logger.warn('running without persistence', {
@@ -27,15 +17,12 @@ export async function connectDb(): Promise<void> {
     });
     return;
   }
-  await db.$connect();
   logger.info('database connected', { database: 'postgresql' });
 }
 
-/** Disconnect Prisma client. */
+/** Disconnect the pool. */
 export async function disconnectDb(): Promise<void> {
-  await db.$disconnect().catch(() => {
-    // ignore disconnect errors
-  });
+  await closePool();
 }
 
-export { db };
+export { pool, findMany, findUnique, findFirst, create, update, del, deleteMany, count };

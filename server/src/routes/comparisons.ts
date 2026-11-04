@@ -19,7 +19,7 @@ comparisonsRouter.get('/', optionalAuth, async (req, res) => {
   const filter = scopeFilter(scope, optionalCallerId(res));
   const caller = optionalCallerId(res);
 
-  const docs = await db.comparison.findMany({
+  const docs = await db.findMany('Comparison', {
     where: filter,
     orderBy: { createdAt: 'asc' },
   });
@@ -36,9 +36,7 @@ comparisonsRouter.get('/', optionalAuth, async (req, res) => {
 
 comparisonsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await db.comparison.findUnique({
-    where: { id },
-  });
+  const doc = await db.findUnique('Comparison', id);
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Comparison not found.');
   const dto = toComparisonDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -53,9 +51,7 @@ comparisonsRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createComparisonSchema, req.body);
   const ownerId = callerId(res);
 
-  const comparison = await db.comparison.create({
-    data: { ...input, ownerId },
-  });
+  const comparison = await db.create('Comparison', { ...input, ownerId });
   res.status(201).json(toComparisonDto(comparison));
 });
 
@@ -67,12 +63,11 @@ comparisonsRouter.patch('/:id', requireAuth, async (req, res) => {
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await db.comparison.update({
-    where: { id },
-    data: changes,
-  });
+  const existing = await db.findUnique('Comparison', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Comparison not found.');
 
-  if (!updated || updated.ownerId !== ownerId) throw notFound('Comparison not found.');
+  const updated = await db.update('Comparison', id, changes);
+
   res.json(toComparisonDto(updated));
 });
 
@@ -80,13 +75,9 @@ comparisonsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const existing = await db.comparison.findUnique({
-    where: { id },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Comparison not found.');
+  const existing = await db.findUnique('Comparison', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Comparison not found.');
 
-  await db.comparison.delete({
-    where: { id },
-  });
+  await db.del('Comparison', id);
   res.status(204).end();
 });

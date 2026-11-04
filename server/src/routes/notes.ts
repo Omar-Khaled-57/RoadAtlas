@@ -21,7 +21,7 @@ notesRouter.get('/', optionalAuth, async (req, res) => {
   if (targetType) filter.targetType = targetType;
   if (targetId) filter.targetId = targetId;
 
-  const docs = await db.note.findMany({
+  const docs = await db.findMany('Note', {
     where: filter,
     orderBy: { createdAt: 'asc' },
   });
@@ -38,9 +38,7 @@ notesRouter.get('/', optionalAuth, async (req, res) => {
 
 notesRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await db.note.findUnique({
-    where: { id },
-  });
+  const doc = await db.findUnique('Note', id);
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Note not found.');
   const dto = toNoteDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -55,9 +53,7 @@ notesRouter.post('/', requireAuth, async (req, res) => {
   const input = parseOrThrow(createNoteSchema, req.body);
   const ownerId = callerId(res);
 
-  const note = await db.note.create({
-    data: { ...input, ownerId },
-  });
+  const note = await db.create('Note', { ...input, ownerId });
   res.status(201).json(toNoteDto(note));
 });
 
@@ -66,19 +62,13 @@ notesRouter.patch('/:id', requireAuth, async (req, res) => {
   const input = parseOrThrow(updateNoteSchema, req.body);
   const ownerId = callerId(res);
 
-  const existing = await db.note.findUnique({
-    where: { id },
-    select: { ownerId: true },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Note not found.');
+  const existing = await db.findUnique('Note', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Note not found.');
 
   const changes = Object.fromEntries(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  const updated = await db.note.update({
-    where: { id },
-    data: changes,
-  });
+  const updated = await db.update('Note', id, changes);
 
   res.json(toNoteDto(updated));
 });
@@ -87,13 +77,9 @@ notesRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const existing = await db.note.findUnique({
-    where: { id },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Note not found.');
+  const existing = await db.findUnique('Note', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Note not found.');
 
-  await db.note.delete({
-    where: { id },
-  });
+  await db.del('Note', id);
   res.status(204).end();
 });

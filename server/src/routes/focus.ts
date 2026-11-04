@@ -17,9 +17,7 @@ focusRouter.get('/', requireAuth, async (_req, res, next) => {
     return;
   }
   const ownerId = callerId(res);
-  const focus = await db.focus.findFirst({
-    where: { ownerId },
-  });
+  const focus = await db.findFirst('Focus', { ownerId });
 
   res.json(
     focus
@@ -54,26 +52,20 @@ focusRouter.put('/', requireAuth, async (req, res, next) => {
     await Promise.all(
       input.items.map(async (item) => {
         if (item.kind === 'milestone') {
-          const step = await db.step.findUnique({
-            where: { id: item.targetId },
-          });
-          if (!step || step.ownerId !== ownerId) throw badRequest('Focus milestone must reference an owned step.');
-          const parent = await db.roadmap.findUnique({
-            where: { id: step.roadmapId },
-          });
-          if (!parent || parent.ownerId !== ownerId || parent.kind !== 'pipeline') {
+          const step = await db.findUnique('Step', item.targetId);
+          if (!step || (step as { ownerId: string }).ownerId !== ownerId) throw badRequest('Focus milestone must reference an owned step.');
+          const parent = await db.findUnique('Roadmap', (step as { roadmapId: string }).roadmapId);
+          if (!parent || (parent as { ownerId: string }).ownerId !== ownerId || (parent as { kind: string }).kind !== 'pipeline') {
             throw badRequest('Focus milestone must belong to an owned pipeline.');
           }
           return;
         }
         const expectedKind = item.kind === 'technology' ? 'tech' : 'pipeline';
-        const roadmap = await db.roadmap.findUnique({
-          where: { id: item.targetId },
-        });
+        const roadmap = await db.findUnique('Roadmap', item.targetId);
         if (
           !roadmap ||
-          roadmap.ownerId !== ownerId ||
-          roadmap.kind !== expectedKind
+          (roadmap as { ownerId: string }).ownerId !== ownerId ||
+          (roadmap as { kind: string }).kind !== expectedKind
         ) {
           throw badRequest('Focus row must reference a matching owned roadmap.');
         }
@@ -116,11 +108,13 @@ focusRouter.put('/', requireAuth, async (req, res, next) => {
     set.weeklyFocusConfigured = true;
   }
 
-  const focus = await db.focus.upsert({
-    where: { ownerId },
-    update: set,
-    create: { ownerId, ...set },
-  });
+  const existing = await db.findFirst('Focus', { ownerId });
+  let focus;
+  if (existing) {
+    focus = await db.update('Focus', (existing as { id: string }).id, set);
+  } else {
+    focus = await db.create('Focus', { ownerId, ...set });
+  }
 
   res.json(toFocusDto(focus));
 });

@@ -32,6 +32,3 @@ backups/
 
 # generated serverless bundle
 api/_server.cjs
-
-# prisma generated client cache
-server/prisma/.prisma/

@@ -39,14 +39,9 @@ function parentKindMessage(parentKind: string, childKind: string): string {
 
 /** Remove `undefined` entries so a partial update never clears a field by accident. */
 function definedEntries(input: Record<string, unknown>): Record<string, unknown> {
-  const entries = Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined && value !== null),
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => value !== undefined),
   );
-  if ('revision' in entries && typeof entries.revision === 'number') {
-    entries.revision = (entries.revision ?? 0) + 1;
-    return entries;
-  }
-  return entries;
 }
 
 /** True when pointing `childId` at `parentId` would close a parent chain cycle. */
@@ -56,12 +51,8 @@ async function createsParentCycle(childId: string, parentId: string): Promise<bo
   while (cursor && !seen.has(cursor) && seen.size < 100) {
     if (cursor === childId) return true;
     seen.add(cursor);
-    let node: { parentId: string | null } | null = null;
-    node = await db.roadmap.findUnique({
-      where: { id: cursor },
-      select: { parentId: true },
-    });
-    cursor = node?.parentId ? String(node.parentId) : undefined;
+    const node = await db.findUnique('Roadmap', cursor);
+    cursor = (node as { parentId: string | null } | null)?.parentId ?? undefined;
   }
   return false;
 }
@@ -69,9 +60,9 @@ async function createsParentCycle(childId: string, parentId: string): Promise<bo
 roadmapsRouter.get('/', optionalAuth, async (req, res) => {
   const { scope = 'public' } = parseOrThrow(listQuerySchema, req.query);
   const filter = scopeFilter(scope, optionalCallerId(res));
-  const docs = await db.roadmap.findMany({
+  const docs = await db.findMany('Roadmap', {
     where: filter,
-    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    orderBy: { order: 'asc', createdAt: 'asc' },
   });
   const items = docs.map((doc) => {
     const dto = toRoadmapDto(doc) as unknown as Record<string, unknown>;
@@ -88,9 +79,7 @@ roadmapsRouter.get('/', optionalAuth, async (req, res) => {
 
 roadmapsRouter.get('/:id', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const doc = await db.roadmap.findUnique({
-    where: { id },
-  });
+  const doc = await db.findUnique('Roadmap', id);
   if (!doc || !isReadable(doc, optionalCallerId(res))) throw notFound('Roadmap not found.');
   const dto = toRoadmapDto(doc) as unknown as Record<string, unknown>;
   if (doc.visibility === 'public' && !optionalCallerId(res)) {
@@ -107,47 +96,32 @@ roadmapsRouter.post('/', requireAuth, async (req, res) => {
   const { steps, ...roadmapInput } = input;
 
   if (roadmapInput.parentId) {
-    const parent = await db.roadmap.findUnique({
-      where: { id: roadmapInput.parentId },
-      select: { kind: true, ownerId: true },
-    });
-    if (!parent || parent.ownerId !== ownerId) {
+    const parent = await db.findUnique('Roadmap', roadmapInput.parentId as string);
+    if (!parent || (parent as { ownerId: string }).ownerId !== ownerId) {
       res.status(400).json({ message: 'Parent roadmap not found.' });
       return;
     }
-    if (!canContain(parent.kind, roadmapInput.kind)) {
-      res.status(400).json({ message: parentKindMessage(parent.kind, roadmapInput.kind) });
+    if (!canContain((parent as { kind: string }).kind, roadmapInput.kind)) {
+      res.status(400).json({ message: parentKindMessage((parent as { kind: string }).kind, roadmapInput.kind) });
       return;
     }
   }
 
-  const { description, techId, ...roadmapRest } = roadmapInput;
-  const roadmap = await db.roadmap.create({
-    data: {
-      ...roadmapRest,
-      ownerId,
-      description: description ?? undefined,
-      techId: techId ?? undefined,
-      ...(steps?.length
-        ? {
-            steps: {
-              create: steps.map((step, index) => ({
-                title: step.title,
-                description: step.description ?? undefined,
-                resources: step.resources ?? [],
-                order: step.order ?? index,
-                stage: step.stage ?? undefined,
-                note: step.note ?? undefined,
-                done: step.done ?? undefined,
-                ownerId,
-                linkedRoadmapId: step.linkedRoadmapId ?? undefined,
-                linkedStepId: step.linkedStepId ?? undefined,
-              })),
-            },
-          }
-        : {}),
-    },
+  const roadmap = await db.create('Roadmap', {
+    ...roadmapInput,
+    ownerId,
   });
+
+  if (steps?.length) {
+    for (const [index, step] of steps.entries()) {
+      await db.create('Step', {
+        ...step,
+        ownerId,
+        roadmapId: (roadmap as { id: string }).id,
+        order: step.order ?? index,
+      });
+    }
+  }
 
   res.status(201).json(toRoadmapDto(roadmap));
 });
@@ -162,26 +136,20 @@ roadmapsRouter.patch('/:id', requireAuth, async (req, res) => {
       res.status(400).json({ message: 'A roadmap cannot be its own parent.' });
       return;
     }
-    const current = await db.roadmap.findUnique({
-      where: { id },
-      select: { kind: true, ownerId: true },
-    });
-    if (!current || current.ownerId !== ownerId) throw notFound('Roadmap not found.');
-    const parent = await db.roadmap.findUnique({
-      where: { id: input.parentId },
-      select: { kind: true, parentId: true, ownerId: true },
-    });
-    if (!parent || parent.ownerId !== ownerId) {
+    const current = await db.findUnique('Roadmap', id);
+    if (!current || (current as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
+    const parent = await db.findUnique('Roadmap', input.parentId as string);
+    if (!parent || (parent as { ownerId: string }).ownerId !== ownerId) {
       res.status(400).json({ message: 'Parent roadmap not found.' });
       return;
     }
-    if (await createsParentCycle(id, input.parentId)) {
+    if (await createsParentCycle(id, input.parentId as string)) {
       res.status(400).json({ message: 'Circular parent-child relationship.' });
       return;
     }
-    const effectiveKind = input.kind ?? current.kind;
-    if (!canContain(parent.kind, effectiveKind)) {
-      res.status(400).json({ message: parentKindMessage(parent.kind, effectiveKind) });
+    const effectiveKind = input.kind ?? (current as { kind: string }).kind;
+    if (!canContain((parent as { kind: string }).kind, effectiveKind)) {
+      res.status(400).json({ message: parentKindMessage((parent as { kind: string }).kind, effectiveKind) });
       return;
     }
   }
@@ -190,53 +158,43 @@ roadmapsRouter.patch('/:id', requireAuth, async (req, res) => {
   // otherwise parentage becomes cross-kind through the back door.
   if (input.kind) {
     const nextKind = input.kind;
-    const current = await db.roadmap.findUnique({
-      where: { id },
-      select: { parentId: true, ownerId: true },
-    });
-    if (!current || current.ownerId !== ownerId) throw notFound('Roadmap not found.');
+    const current = await db.findUnique('Roadmap', id);
+    if (!current || (current as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-    if (!('parentId' in input) && current.parentId) {
-      const parent = await db.roadmap.findUnique({
-        where: { id: current.parentId },
-        select: { kind: true },
-      });
-      if (parent && !canContain(parent.kind, nextKind)) {
-        res.status(400).json({ message: parentKindMessage(parent.kind, nextKind) });
+    if (!('parentId' in input) && (current as { parentId: string | null }).parentId) {
+      const parent = await db.findUnique('Roadmap', (current as { parentId: string }).parentId);
+      if (parent && !canContain((parent as { kind: string }).kind, nextKind)) {
+        res.status(400).json({ message: parentKindMessage((parent as { kind: string }).kind, nextKind) });
         return;
       }
     }
 
-    const children = await db.roadmap.findMany({
+    const children = await db.findMany('Roadmap', {
       where: { parentId: id },
-      select: { kind: true },
     });
-    const mismatchedChildKind = children.find((kind) => !canContain(nextKind, kind.kind));
+    const mismatchedChildKind = children.find(
+      (c) => !canContain(nextKind, (c as { kind: string }).kind),
+    );
     if (mismatchedChildKind) {
-      res.status(400).json({ message: parentKindMessage(nextKind, mismatchedChildKind.kind) });
+      res.status(400).json({ message: parentKindMessage(nextKind, (mismatchedChildKind as { kind: string }).kind) });
       return;
     }
   }
 
   const update = { ...input };
   if ('revision' in update && typeof update.revision === 'number') {
-    const existing = await db.roadmap.findUnique({
-      where: { id },
-      select: { revision: true, ownerId: true },
-    });
-    if (!existing || existing.ownerId !== ownerId) throw notFound('Roadmap not found.');
-    if (existing.revision !== update.revision) {
+    const existing = await db.findUnique('Roadmap', id);
+    if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
+    if ((existing as { revision: number }).revision !== update.revision) {
       res.status(409).json({ message: 'Conflict: roadmap was updated elsewhere.' });
       return;
     }
   }
 
-  const updated = await db.roadmap.update({
-    where: { id },
-    data: definedEntries(update),
-  });
+  const changes = definedEntries(update);
+  const updated = await db.update('Roadmap', id, changes);
 
-  if (!updated || updated.ownerId !== ownerId) throw notFound('Roadmap not found.');
+  if (!updated || (updated as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
   res.json(toRoadmapDto(updated));
 });
 
@@ -244,35 +202,27 @@ roadmapsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const children = await db.roadmap.count({
-    where: { parentId: id, ownerId },
-  });
+  const children = await db.count('Roadmap', { parentId: id, ownerId });
   if (children > 0) {
     res.status(400).json({ message: 'Reparent or remove child roadmaps before deleting.' });
     return;
   }
 
-  const existing = await db.roadmap.findUnique({
-    where: { id },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Roadmap not found.');
+  const existing = await db.findUnique('Roadmap', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-  await db.roadmap.delete({
-    where: { id },
-  });
+  await db.del('Roadmap', id);
 
   res.status(204).end();
 });
 
 roadmapsRouter.get('/:id/steps', optionalAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
-  const roadmap = await db.roadmap.findUnique({
-    where: { id },
-  });
+  const roadmap = await db.findUnique('Roadmap', id);
   if (!roadmap || !isReadable(roadmap, optionalCallerId(res))) throw notFound('Roadmap not found.');
   const caller = optionalCallerId(res);
 
-  const steps = await db.step.findMany({
+  const steps = await db.findMany('Step', {
     where: { roadmapId: id },
     orderBy: { order: 'asc' },
   });
@@ -292,21 +242,15 @@ roadmapsRouter.post('/:id/steps', requireAuth, async (req, res) => {
   const input = parseOrThrow(createStepSchema, req.body);
   const ownerId = callerId(res);
 
-  const roadmap = await db.roadmap.findUnique({
-    where: { id },
-  });
-  if (!roadmap || roadmap.ownerId !== ownerId) throw notFound('Roadmap not found.');
+  const roadmap = await db.findUnique('Roadmap', id);
+  if (!roadmap || (roadmap as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-  const count = await db.step.count({
-    where: { roadmapId: id },
-  });
-  const step = await db.step.create({
-    data: {
-      ...input,
-      ownerId,
-      roadmapId: id,
-      order: input.order ?? count,
-    },
+  const count = await db.count('Step', { roadmapId: id });
+  const step = await db.create('Step', {
+    ...input,
+    ownerId,
+    roadmapId: id,
+    order: input.order ?? count,
   });
 
   res.status(201).json(toStepDto(step));
@@ -316,21 +260,15 @@ roadmapsRouter.get('/:id/progress', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const roadmap = await db.roadmap.findUnique({
-    where: { id },
-  });
-  if (!roadmap || roadmap.ownerId !== ownerId) throw notFound('Roadmap not found.');
+  const roadmap = await db.findUnique('Roadmap', id);
+  if (!roadmap || (roadmap as { ownerId: string }).ownerId !== ownerId) throw notFound('Roadmap not found.');
 
-  const steps = await db.step.findMany({
+  const steps = await db.findMany('Step', {
     where: { roadmapId: id },
-    select: { id: true },
   });
-  const items = await db.progress.findMany({
-    where: {
-      ownerId,
-      stepId: { in: steps.map((step) => step.id) },
-    },
-  });
+  const stepIds = new Set((steps as { id: string }[]).map((step) => step.id));
+  const allProgress = await db.findMany('Progress', { where: { ownerId } });
+  const items = (allProgress as { stepId: string }[]).filter((p) => stepIds.has(p.stepId));
 
   res.json({ items: items.map(toProgressDto) });
 });

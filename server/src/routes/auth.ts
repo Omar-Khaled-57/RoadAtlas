@@ -65,10 +65,7 @@ authRouter.post('/logout', async (req, res, next) => {
   try {
     const user = await readSession(req.cookies?.[SESSION_COOKIE]);
     if (user && hasDb) {
-      await db.user.update({
-        where: { id: user.id },
-        data: { sessionVersion: { increment: 1 } },
-      });
+      await db.update('User', user.id, { sessionVersion: ((user as { sessionVersion?: number }).sessionVersion ?? 0) + 1 });
     }
     res.clearCookie(SESSION_COOKIE, sessionCookieOptions(false));
     res.json({ authenticated: false, user: null });

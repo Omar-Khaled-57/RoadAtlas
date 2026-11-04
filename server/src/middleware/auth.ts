@@ -56,7 +56,7 @@ export function authConfigured(): boolean {
 
 /**
  * Verifies credentials against the user table. With a database the user
- * collection is the source of truth; without one the configured administrator
+ * table is the source of truth; without one the configured administrator
  * still signs in, but nothing is persisted — the API reports that state instead
  * of pretending to save.
  */
@@ -70,16 +70,14 @@ export async function authenticateOwner(
 
   if (hasDb) {
     const adminEmail = (env.ADMIN_EMAIL ?? '').trim().toLowerCase();
-    const existing = await db.user.findFirst({
-      where: { email: normalized },
-    });
+    const existing = await db.findFirst('User', { email: normalized });
     if (existing) {
-      const matches = await bcrypt.compare(password, existing.passwordHash);
+      const matches = await bcrypt.compare(password, (existing as { passwordHash: string }).passwordHash);
       return matches
         ? {
-            id: existing.id,
-            email: existing.email,
-            sessionVersion: existing.sessionVersion ?? 0,
+            id: (existing as { id: string }).id,
+            email: (existing as { email: string }).email,
+            sessionVersion: (existing as { sessionVersion: number }).sessionVersion ?? 0,
           }
         : null;
     }
@@ -90,24 +88,18 @@ export async function authenticateOwner(
 
     // The bootstrap may only create the first account. Provisioning is the
     // single-owner path; this fallback must never add a second user.
-    const otherUsers = await db.user.count({
-      where: { email: { not: adminEmail } },
-    });
+    const otherUsers = await db.count('User', { email: { not: adminEmail } });
     if (otherUsers > 0) return null;
 
-    const created = await db.user.upsert({
-      where: { email: adminEmail },
-      update: {},
-      create: {
-        email: adminEmail,
-        passwordHash: env.ADMIN_PASSWORD_HASH as string,
-        sessionVersion: 0,
-      },
+    const created = await db.create('User', {
+      email: adminEmail,
+      passwordHash: env.ADMIN_PASSWORD_HASH as string,
+      sessionVersion: 0,
     });
     return {
-      id: created.id,
-      email: created.email,
-      sessionVersion: created.sessionVersion ?? 0,
+      id: (created as { id: string }).id,
+      email: (created as { email: string }).email,
+      sessionVersion: (created as { sessionVersion: number }).sessionVersion ?? 0,
     };
   }
 
@@ -158,12 +150,10 @@ export async function readSession(token: unknown): Promise<SessionUser | null> {
   if (typeof payload.sv !== 'number') return null;
 
   if (hasDb) {
-    const user = await db.user.findUnique({
-      where: { id: payload.sub },
-    });
+    const user = await db.findUnique('User', payload.sub);
     if (!user) return null;
-    if (payload.sv !== (user.sessionVersion ?? 0)) return null;
-    return { id: user.id, email: user.email };
+    if (payload.sv !== ((user as { sessionVersion: number }).sessionVersion ?? 0)) return null;
+    return { id: (user as { id: string }).id, email: (user as { email: string }).email };
   }
 
   if (!env.ADMIN_EMAIL) return null;

@@ -15,12 +15,9 @@ stepsRouter.patch('/:id', requireAuth, async (req, res) => {
   const ownerId = callerId(res);
 
   if ('revision' in input && typeof input.revision === 'number') {
-    const existing = await db.step.findUnique({
-      where: { id },
-      select: { revision: true, ownerId: true },
-    });
-    if (!existing || existing.ownerId !== ownerId) throw notFound('Step not found.');
-    if (existing.revision !== input.revision) {
+    const existing = await db.findFirst('Step', { id });
+    if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Step not found.');
+    if ((existing as { revision: number }).revision !== input.revision) {
       res.status(409).json({ message: 'Conflict: step was updated elsewhere.' });
       return;
     }
@@ -32,18 +29,9 @@ stepsRouter.patch('/:id', requireAuth, async (req, res) => {
   if ('revision' in changes && typeof changes.revision === 'number') {
     changes.revision = (changes.revision ?? 0) + 1;
   }
+  const updated = await db.update('Step', id, changes);
 
-  const existing = await db.step.findUnique({
-    where: { id },
-    select: { ownerId: true },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Step not found.');
-
-  const updated = await db.step.update({
-    where: { id },
-    data: changes,
-  });
-
+  if (!updated) throw notFound('Step not found.');
   res.json(toStepDto(updated));
 });
 
@@ -51,15 +39,11 @@ stepsRouter.delete('/:id', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const existing = await db.step.findUnique({
-    where: { id },
-  });
-  if (!existing || existing.ownerId !== ownerId) throw notFound('Step not found.');
+  const existing = await db.findUnique('Step', id);
+  if (!existing || (existing as { ownerId: string }).ownerId !== ownerId) throw notFound('Step not found.');
 
-  await db.step.delete({
-    where: { id },
-  });
-  await db.progress.deleteMany({ where: { stepId: id } });
+  await db.del('Step', id);
+  await db.deleteMany('Progress', { stepId: id });
   res.status(204).end();
 });
 
@@ -67,14 +51,10 @@ stepsRouter.get('/:id/progress', requireAuth, async (req, res) => {
   const id = parseOrThrow(objectIdSchema, req.params.id);
   const ownerId = callerId(res);
 
-  const step = await db.step.findUnique({
-    where: { id },
-  });
-  if (!step || step.ownerId !== ownerId) throw notFound('Step not found.');
+  const step = await db.findUnique('Step', id);
+  if (!step || (step as { ownerId: string }).ownerId !== ownerId) throw notFound('Step not found.');
 
-  const progress = await db.progress.findFirst({
-    where: { ownerId, stepId: id },
-  });
+  const progress = await db.findFirst('Progress', { ownerId, stepId: id });
   res.json(progress ? toProgressDto(progress) : null);
 });
 
@@ -83,10 +63,8 @@ stepsRouter.put('/:id/progress', requireAuth, async (req, res) => {
   const input = parseOrThrow(progressSchema, req.body);
   const ownerId = callerId(res);
 
-  const step = await db.step.findUnique({
-    where: { id },
-  });
-  if (!step || step.ownerId !== ownerId) throw notFound('Step not found.');
+  const step = await db.findUnique('Step', id);
+  if (!step || (step as { ownerId: string }).ownerId !== ownerId) throw notFound('Step not found.');
 
   const done = input.done ?? input.status === 'done';
   const update: Record<string, unknown> = {
@@ -96,19 +74,12 @@ stepsRouter.put('/:id/progress', requireAuth, async (req, res) => {
   if (input.status !== undefined) update.status = input.status;
   if (input.percent !== undefined) update.percent = input.percent;
 
-  const existing = await db.progress.findFirst({
-    where: { ownerId, stepId: id },
-  });
+  const existing = await db.findFirst('Progress', { ownerId, stepId: id });
   let progress;
   if (existing) {
-    progress = await db.progress.update({
-      where: { id: existing.id },
-      data: update,
-    });
+    progress = await db.update('Progress', (existing as { id: string }).id, update);
   } else {
-    progress = await db.progress.create({
-      data: { ownerId, stepId: id, ...update },
-    });
+    progress = await db.create('Progress', { ownerId, stepId: id, ...update });
   }
 
   res.json(toProgressDto(progress));
