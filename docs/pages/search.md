@@ -1,6 +1,6 @@
 # Search — `/search`
 
-**Priority:** P2 · **Status:** Coming soon · **Reserved:** yes
+**Priority:** P2 (original) · **Status:** Implemented (originally reserved)
 
 ## Purpose
 
@@ -17,4 +17,10 @@ base + search_, Increment 4). Ships alongside the knowledge base.
 
 ## Now
 
-Reserved route that renders a **"coming soon"** state. Appears in nav/footer (ordered by priority).
+The original reserved design was a **"coming soon"** state in nav/footer. The
+current route is implemented by
+[`SearchPage.tsx`](../../client/src/pages/SearchPage.tsx): case/diacritic-insensitive
+client-side matching with type filters across roadmaps, steps, technologies,
+comparisons, curves, notes and decisions. It appears in the nav; `Cmd/Ctrl+K`
+navigates to `/search` through
+[`AppShell.tsx`](../../client/src/components/AppShell.tsx).

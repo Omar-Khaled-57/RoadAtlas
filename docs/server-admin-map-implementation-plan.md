@@ -3,6 +3,35 @@
 **Status:** Revised implementation plan; approved direction, implementation in progress.  
 **Prepared:** 2026-10-23 · **Revised:** 2026-10-24
 
+**Current implementation note (2026-11-24):** this plan is retained as a dated
+target, but its §3 audit describes a MongoDB-era snapshot. The current runtime
+uses PostgreSQL via `pg`; [architecture.md](./architecture.md) and
+[configuration.md](./configuration.md) describe it. Items from the plan that are
+now evidenced in code:
+
+| Plan item                                                                                                                | Current evidence                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Single-owner session with `sessionVersion` and revocation                                                                | [`schema.sql`](../server/sql/schema.sql), [`middleware/auth.ts`](../server/src/middleware/auth.ts), [`routes/auth.ts`](../server/src/routes/auth.ts)                                                                                                                                                                                                                     |
+| Public-by-default visibility and anonymous field redaction                                                               | Schema defaults `visibility` to `public`; [`routes/roadmaps.ts`](../server/src/routes/roadmaps.ts), [`routes/comparisons.ts`](../server/src/routes/comparisons.ts), [`routes/metrics.ts`](../server/src/routes/metrics.ts), [`routes/notes.ts`](../server/src/routes/notes.ts) and [`routes/decisions.ts`](../server/src/routes/decisions.ts) filter/redact public reads |
+| Parent existence, kind and cycle checks; block deleting parents with children; revision conflict on roadmap/step updates | [`routes/roadmaps.ts`](../server/src/routes/roadmaps.ts), [`routes/steps.ts`](../server/src/routes/steps.ts)                                                                                                                                                                                                                                                             |
+| HTTP(S)-only link validation and `0..1` comparison weights                                                               | [`validation/schemas.ts`](../server/src/validation/schemas.ts)                                                                                                                                                                                                                                                                                                           |
+| Hidden login, `OMR` activation and contextual logout                                                                     | [`AppShell.tsx`](../client/src/components/AppShell.tsx)                                                                                                                                                                                                                                                                                                                  |
+| Knowledge, Decisions and Search implemented rather than "coming soon"                                                    | [`App.tsx`](../client/src/App.tsx), [`pages/README.md`](./pages/README.md)                                                                                                                                                                                                                                                                                               |
+| Progress endpoints require a session                                                                                     | [`routes/steps.ts`](../server/src/routes/steps.ts), [`routes/roadmaps.ts`](../server/src/routes/roadmaps.ts)                                                                                                                                                                                                                                                             |
+
+Items not evidenced as complete: no migration ledger, idempotent seed import or
+PostgreSQL backup/restore script exists; the legacy scripts remain MongoDB-based
+([configuration.md](./configuration.md#known-gaps)). The schema has a
+non-unique `(ownerId, stepId)` index, not the planned unique constraint
+([`schema.sql`](../server/sql/schema.sql)). Criterion IDs are still optional in
+validation, `PATCH /api/roadmaps/:id` has no explicit step-update branch, and
+revision conflict checks are implemented only for roadmaps and steps
+([`validation/schemas.ts`](../server/src/validation/schemas.ts),
+[`routes/roadmaps.ts`](../server/src/routes/roadmaps.ts)). Comparison and metric
+client CRUD are not present; [`ComparePage.tsx`](../client/src/pages/ComparePage.tsx)
+shows an owner-controls label but no mutation form. References below to
+"deployed MongoDB topology" are historical.
+
 ## 1. Approved model
 
 RoadAtlas is a public atlas. Visitors browse and read without an account. The

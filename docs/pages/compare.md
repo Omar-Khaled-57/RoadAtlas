@@ -64,4 +64,5 @@ hardcoded columns (research §3).
 
 - Criteria are independent of curve metrics (resolved in [0004](../decisions/0004-domain-model-v2.md));
   a metric may _seed_ a criterion, but they are stored separately.
-- The Conclusion may link to a `/decisions` record (reserved).
+- The Conclusion may link to a `/decisions` record; that route is now implemented
+  (it was originally reserved). See [decisions](./decisions.md).

@@ -1,6 +1,6 @@
 # Knowledge Base — `/knowledge`
 
-**Priority:** P2 · **Status:** Coming soon · **Reserved:** yes
+**Priority:** P2 (original) · **Status:** Implemented (originally reserved)
 
 ## Purpose
 
@@ -23,5 +23,11 @@ tags[], references[])` — see [0004](../decisions/0004-domain-model-v2.md).
 
 ## Now
 
-Reserved route that renders a **"coming soon"** state. Still appears in nav/footer (ordered by
-priority) and on the home page only if we decide to surface a teaser.
+The original reserved design was a **"coming soon"** state in nav/footer. The
+current route is implemented by
+[`KnowledgePage.tsx`](../../client/src/pages/KnowledgePage.tsx) with note
+filtering, local query matching, Markdown rendering and owner create/edit/delete
+forms when authenticated. Public notes are listed for visitors;
+[`KnowledgeDetailPage.tsx`](../../client/src/pages/KnowledgeDetailPage.tsx)
+handles `/knowledge/:id`. The route appears in the nav; see
+[`AppShell.tsx`](../../client/src/components/AppShell.tsx).

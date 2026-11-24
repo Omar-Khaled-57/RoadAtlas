@@ -2,6 +2,13 @@
 
 **Status:** Proposed · **Date:** 2026-10-15
 
+**Current implementation note:** this ADR uses MongoDB `ObjectId` terminology
+because it was written for the original stack. The current PostgreSQL schema in
+[`server/sql/schema.sql`](../../server/sql/schema.sql) uses UUIDs, `jsonb` for
+localized fields and a unique `Focus.ownerId`. The domain relationships below
+still describe the implemented model; see
+[architecture.md](../architecture.md).
+
 ## Context
 
 [0001](./0001-project-scope.md) sketched a first domain model while scoping the project. A full page
@@ -29,8 +36,9 @@ stands only as history.
 
 ## Decision
 
-**Ownership (all user-owned entities).** Add `ownerId: ObjectId` to `Roadmap`, `Step`, `Comparison`,
-`Metric`, `Note`, `DecisionRecord`, `Progress`, `Focus`. **The server derives the owner from the
+**Ownership (all user-owned entities).** Add `ownerId` to `Roadmap`, `Step`, `Comparison`,
+`Metric`, `Note`, `DecisionRecord`, `Progress`, `Focus`; the original ADR called
+this an `ObjectId`, while the current PostgreSQL schema uses UUIDs. **The server derives the owner from the
 verified session, never from a client-supplied id** (research §3). One owner uses the first release;
 no ownership schema change is needed to add more users later.
 
@@ -82,8 +90,9 @@ columns exist. `lastVisited = { roadmapId, stepId, at }` powers _continue where 
 separate from the editable focus rows and columns.
 
 **DecisionRecord (new).** `DecisionRecord(ownerId, visibility, context, alternatives[], decision,
-consequences, revisitAt, links[], createdAt, updatedAt)` — backs the reserved `/decisions` page
-(research §2 → 04).
+consequences, revisitAt, links[], createdAt, updatedAt)` — backs the `/decisions`
+page (research §2 → 04), which is implemented in
+[`client/src/pages/DecisionsPage.tsx`](../../client/src/pages/DecisionsPage.tsx).
 
 **Relationships.** Store explicit foreign-key ids; indexes follow real query patterns (research §3).
 
@@ -98,5 +107,7 @@ consequences, revisitAt, links[], createdAt, updatedAt)` — backs the reserved 
 
 ## Open questions
 
-- Is `Focus` per-owner singleton, or a small history (recent list)?
+- Is `Focus` per-owner singleton, or a small history (recent list)? The current
+  schema enforces one row per owner with a unique `ownerId`; visit history is
+  stored in the `lastVisited` JSON field.
 - Do we expose a public `Focus` ("now" card) or keep it owner-only with a curated public fallback?

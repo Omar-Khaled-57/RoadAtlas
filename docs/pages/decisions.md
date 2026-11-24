@@ -1,6 +1,6 @@
 # Architecture Decisions — `/decisions`
 
-**Priority:** P2 · **Status:** Coming soon · **Reserved:** yes
+**Priority:** P2 (original) · **Status:** Implemented (originally reserved)
 
 ## Purpose
 
@@ -23,5 +23,10 @@ links[])` — see [0004](../decisions/0004-domain-model-v2.md).
 
 ## Now
 
-Reserved route that renders a **"coming soon"** state. Still appears in nav/footer (ordered by
-priority). Compare conclusions can link to a future decision record.
+The original reserved design was a **"coming soon"** state in nav/footer. The
+current route is implemented by
+[`DecisionsPage.tsx`](../../client/src/pages/DecisionsPage.tsx) with public
+record lists, localized context/alternatives/decision/consequences, revisit
+dates, links and owner create/edit/delete forms when authenticated.
+[`DecisionsDetailPage.tsx`](../../client/src/pages/DecisionsDetailPage.tsx)
+handles `/decisions/:id`; the route appears in the nav.

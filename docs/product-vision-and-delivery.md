@@ -3,6 +3,12 @@
 **Status:** Working product brief · **Source:** [founding conversation](./research/react-native-vs-kmp.md)
 ([shared conversation](https://chatgpt.com/share/6ad078b0-f308-83ea-9654-c84e63fe42c1))
 
+**Current implementation note:** this brief records product intent, not the
+final stack or page status. The running API uses PostgreSQL via `pg` and
+`DATABASE_URL`, and `/knowledge`, `/decisions` and `/search` are implemented
+routes. See [architecture.md](./architecture.md) and the status column in
+[pages/README.md](./pages/README.md).
+
 ## Product vision
 
 RoadAtlas is a deployed, personal-first engineering roadmap and decision hub that can grow into a
@@ -48,8 +54,8 @@ as part of its first usable increment—not postponed as a polish pass.
 | ---------------------- | ------------------------------------------------------------------------------------- | ---------------------------- |
 | Roadmaps               | Organize learning paths, milestones, prerequisites, progress, and branches            | `/roadmaps`, `/roadmaps/:id` |
 | Technology comparisons | Evaluate candidates using changeable criteria, evidence, trade-offs, and a conclusion | `/compare`                   |
-| Knowledge base         | Keep notes and references connected to technologies, roadmap topics, and decisions    | `/knowledge` (reserved)      |
-| Architecture decisions | Preserve context, alternatives, outcomes, and revisit dates                           | `/decisions` (reserved)      |
+| Knowledge base         | Keep notes and references connected to technologies, roadmap topics, and decisions    | `/knowledge` (implemented)   |
+| Architecture decisions | Preserve context, alternatives, outcomes, and revisit dates                           | `/decisions` (implemented)   |
 | Dashboard and focus    | Show current work, useful next steps, recent activity, and progress                   | `/`                          |
 | Curves and findings    | Record how learning, complexity, UI work, productivity, or other metrics change       | `/curves`                    |
 | Project pipelines      | Track a concrete project through idea, design, build, ship, and done                  | `/pipelines`                 |
@@ -89,9 +95,14 @@ The detailed rules are in [project scope](./decisions/0001-project-scope.md) and
 
 ## Architecture direction
 
-Use the MERN foundation selected for this project: React + TypeScript + Vite for the client,
-Node.js + Express + TypeScript for the API, and MongoDB + Mongoose for persistence. Organize the
-code as a modular monorepo and add supporting libraries when a real feature needs them. Keep
+The original direction selected a MERN foundation: React + TypeScript + Vite for
+the client, Node.js + Express + TypeScript for the API, and MongoDB + Mongoose
+for persistence. That choice is recorded here as history; the implementation in
+this repository keeps the client/API split but uses PostgreSQL through `pg` and
+`DATABASE_URL` instead of MongoDB/Mongoose. See
+[architecture.md](./architecture.md) for the current stack.
+
+Organize the code as a modular monorepo and add supporting libraries when a real feature needs them. Keep
 validation at the API boundary, separate HTTP handling from business rules and persistence when that
 separation adds value, and centralize authentication and authorization.
 

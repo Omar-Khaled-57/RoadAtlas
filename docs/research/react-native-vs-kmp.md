@@ -471,7 +471,9 @@ And the bloat part with the tables (use grid in the html) you made (carried over
 
 Created the responsive HTML guide covering KMP vs React Native, their use cases, flexibility vs. reusability, and the React Native bloat/performance workflow.
 
-[**Open or download the HTML guide**](sandbox:/mnt/data/react_native_vs_kmp_guide.html)
+The conversation referenced a generated HTML guide at
+`sandbox:/mnt/data/react_native_vs_kmp_guide.html`; that artifact is not
+committed in this repository.
 
 It includes:
 

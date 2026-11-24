@@ -1,6 +1,11 @@
 # 0001 — Project scope, stack and data model
 
-**Status:** Accepted · **Date:** 2026-10-15
+**Status:** Accepted (historical stack; persistence superseded) · **Date:** 2026-10-15
+
+**Current implementation note:** the running API uses Express with `pg` and
+PostgreSQL via `DATABASE_URL`. The MongoDB Atlas/Mongoose choices below are kept
+as the original decision, not as a description of the current runtime. See
+[architecture.md](../architecture.md).
 
 ## Context
 
@@ -14,10 +19,13 @@ and hidden friction discovered as a technology or project becomes more complex. 
 
 - **Monorepo** (npm workspaces): `client/` (Vite + React), `server/` (Express), `shared/` (types).
 - **TypeScript** everywhere.
-- **MongoDB Atlas** (free tier) — no local Mongo (tight disk).
+- **MongoDB Atlas** (free tier) — original persistence decision; the current
+  runtime uses PostgreSQL via `DATABASE_URL`.
 - **Frontend:** React Router, Tailwind, **React Flow** (`@xyflow/react`),
   TanStack Query.
-- **Backend:** Express, Mongoose, zod, JWT in httpOnly cookie, bcrypt.
+- **Backend:** originally Express, Mongoose, zod, JWT in httpOnly cookie,
+  bcrypt; current code uses Express, `pg`, zod, JWT in an httpOnly cookie and
+  bcryptjs.
 - **Access:** one owner in the first release; deployed online with secure authentication and
   server-side authorization. Resources are private by default; selected resources can be published
   for the portfolio.
@@ -40,7 +48,10 @@ Branching = a `hub` roadmap whose children are `tech` roadmaps linked by `parent
 
 ## Consequences
 
-- Mongo's document model lets the data model evolve cheaply (e.g. comparing **learning curve vs
-  complexity curve** — see the [research](../research/react-native-vs-kmp.md)).
-- Needs a free Atlas account for `MONGODB_URI`.
+- The original Mongo document model was chosen to let the data model evolve
+  cheaply (e.g. comparing **learning curve vs complexity curve** — see the
+  [research](../research/react-native-vs-kmp.md)). The current relational schema
+  is in [`server/sql/schema.sql`](../../server/sql/schema.sql).
+- Originally needed a free Atlas account for `MONGODB_URI`; deployment now uses
+  `DATABASE_URL` and PostgreSQL.
 - Full visual CMS (Phase later) will own create/edit/reorder and a curve-point editor.
